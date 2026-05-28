@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intentions de Messes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Cinzel:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --or:       #c9a84c;
+    --or-clair: #e8cc80;
+    --or-pale:  #f5e9c0;
+    --fond:     #122f38;
+    --fond2:    #0d2129;
+    --fond3:    #1a3d4a;
+    --texte:    #f0e8d0;
+    --texte2:   #b8a87a;
+    --rouge:    #c0392b;
+    --vert:     #27ae60;
+    --radius:   6px;
+    --trans:    .2s ease;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--fond);
+    color: var(--texte);
+    font-family: 'EB Garamond', Georgia, serif;
+    font-size: 17px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--fond2);
+    border-bottom: 1px solid rgba(201,168,76,.25);
+    padding: 1.2rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  header .croix { color: var(--or); font-size: 1.4rem; }
+  header h1 {
+    font-family: 'Cinzel', serif;
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--or-clair);
+    letter-spacing: .08em;
+  }
+
+  /* ── Layout ── */
+  .conteneur {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  /* ── Onglets ── */
+  .onglets {
+    display: flex;
+    gap: .4rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid rgba(201,168,76,.2);
+    padding-bottom: .8rem;
+  }
+  .onglet {
+    background: transparent;
+    border: 1px solid rgba(201,168,76,.2);
+    color: var(--texte2);
+    font-family: 'Cinzel', serif;
+    font-size: .78rem;
+    letter-spacing: .08em;
+    padding: .5rem 1.2rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: var(--trans);
+  }
+  .onglet:hover { border-color: var(--or); color: var(--or-clair); }
+  .onglet.actif {
+    background: var(--or);
+    border-color: var(--or);
+    color: var(--fond2);
+    font-weight: 500;
+  }
+
+  /* ── Sections ── */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── Titre de section ── */
+  .titre-section {
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    color: var(--or-clair);
+    letter-spacing: .1em;
+    margin-bottom: 1.4rem;
+    padding-bottom: .6rem;
+    border-bottom: 1px solid rgba(201,168,76,.15);
+    text-transform: uppercase;
+  }
+
+  /* ── Formulaire ── */
+  .grille {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 600px) { .grille { grid-template-columns: 1fr; } }
+  .champ { display: flex; flex-direction: column; gap: .4rem; }
+  .champ label {
+    font-size: .82rem;
+    color: var(--or);
+    letter-spacing: .06em;
+    font-variant: small-caps;
+  }
+  .champ input, .champ textarea {
+    background: var(--fond3);
+    border: 1px solid rgba(201,168,76,.25);
+    border-radius: var(--radius);
+    color: var(--texte);
+    font-family: 'EB Garamond', serif;
+    font-size: 1rem;
+    padding: .55rem .85rem;
+    transition: var(--trans);
+    outline: none;
+  }
+  .champ input:focus, .champ textarea:focus {
+    border-color: var(--or);
+    background: #1f4555;
+  }
+  .champ textarea { resize: vertical; min-height: 70px; }
+
+  .btn {
+    font-family: 'Cinzel', serif;
+    font-size: .82rem;
+    letter-spacing: .1em;
+    padding: .65rem 1.8rem;
+    border-radius: var(--radius);
+    border: none;
+    cursor: pointer;
+    transition: var(--trans);
+  }
+  .btn-or {
+    background: var(--or);
+    color: var(--fond2);
+  }
+  .btn-or:hover { background: var(--or-clair); }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--or);
+    color: var(--or-clair);
+  }
+  .btn-outline:hover { background: rgba(201,168,76,.1); }
+  .btn-rouge {
+    background: var(--rouge);
+    color: #fff;
+  }
+  .btn-row { display: flex; gap: .8rem; margin-top: 1.2rem; align-items: center; }
+
+  /* ── Messages ── */
+  .message {
+    border-radius: var(--radius);
+    padding: .9rem 1.2rem;
+    margin: 1rem 0;
+    font-size: .95rem;
+    line-height: 1.5;
+    display: none;
+  }
+  .message.visible { display: block; }
+  .message.succes  { background: rgba(39,174,96,.15); border: 1px solid rgba(39,174,96,.4); color: #6fcf97; }
+  .message.erreur  { background: rgba(192,57,43,.15); border: 1px solid rgba(192,57,43,.4); color: #e57373; }
+  .message.info    { background: rgba(201,168,76,.1);  border: 1px solid rgba(201,168,76,.3); color: var(--or-clair); }
+
+  /* ── Calendrier ── */
+  .nav-mois {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    margin-bottom: 1.4rem;
+  }
+  .nav-mois h2 {
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    color: var(--or-clair);
+    min-width: 180px;
+    text-align: center;
+    letter-spacing: .08em;
+  }
+  .grille-cal {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .entete-cal {
+    text-align: center;
+    font-size: .72rem;
+    color: var(--texte2);
+    font-variant: small-caps;
+    letter-spacing: .06em;
+    padding: .3rem 0;
+  }
+  .jour-cal {
+    background: var(--fond3);
+    border: 1px solid rgba(201,168,76,.1);
+    border-radius: 4px;
+    min-height: 72px;
+    padding: .3rem .4rem;
+    cursor: pointer;
+    transition: var(--trans);
+    position: relative;
+  }
+  .jour-cal:hover { border-color: rgba(201,168,76,.4); }
+  .jour-cal.vide { background: transparent; border: none; cursor: default; }
+  .jour-cal.libre .num-jour { color: var(--vert); }
+  .jour-cal.plein .num-jour { color: var(--texte2); }
+  .jour-cal.violation { border-color: rgba(192,57,43,.5); background: rgba(192,57,43,.08); }
+  .jour-cal.aujourd-hui { border-color: var(--or); }
+  .num-jour {
+    font-family: 'Cinzel', serif;
+    font-size: .8rem;
+    display: block;
+    margin-bottom: .2rem;
+  }
+  .intention-mini {
+    font-size: .68rem;
+    color: var(--texte2);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .intention-mini.fixe { color: var(--or); }
+  .cap-indicator {
+    position: absolute;
+    top: .25rem;
+    right: .35rem;
+    font-size: .62rem;
+    color: var(--texte2);
+  }
+
+  /* ── Tooltip / popup ── */
+  .popup-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .popup-overlay.visible { display: flex; }
+  .popup {
+    background: var(--fond2);
+    border: 1px solid rgba(201,168,76,.3);
+    border-radius: 8px;
+    padding: 1.6rem 2rem;
+    max-width: 480px;
+    width: 95%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .popup h3 {
+    font-family: 'Cinzel', serif;
+    color: var(--or-clair);
+    font-size: .95rem;
+    margin-bottom: 1rem;
+    letter-spacing: .06em;
+  }
+  .liste-intentions { list-style: none; }
+  .liste-intentions li {
+    border-bottom: 1px solid rgba(201,168,76,.1);
+    padding: .5rem 0;
+    font-size: .9rem;
+  }
+  .liste-intentions li:last-child { border: none; }
+  .nom-int { color: var(--texte); }
+  .dem-int { color: var(--texte2); font-size: .82rem; }
+  .fixe-badge {
+    display: inline-block;
+    background: rgba(201,168,76,.2);
+    color: var(--or);
+    border-radius: 3px;
+    padding: .1rem .35rem;
+    font-size: .68rem;
+    margin-left: .4rem;
+    font-variant: small-caps;
+  }
+
+  /* ── Liste violations ── */
+  .violation-item {
+    background: rgba(192,57,43,.1);
+    border: 1px solid rgba(192,57,43,.3);
+    border-radius: var(--radius);
+    padding: .9rem 1.2rem;
+    margin-bottom: .8rem;
+  }
+  .violation-date {
+    font-family: 'Cinzel', serif;
+    color: #e57373;
+    font-size: .85rem;
+    margin-bottom: .5rem;
+  }
+
+  /* ── Date libre ── */
+  .result-libre {
+    background: var(--fond3);
+    border: 1px solid rgba(201,168,76,.2);
+    border-radius: var(--radius);
+    padding: 1.2rem 1.5rem;
+    margin-top: 1rem;
+    display: none;
+  }
+  .result-libre.visible { display: block; }
+  .date-libre-val {
+    font-family: 'Cinzel', serif;
+    font-size: 1.5rem;
+    color: var(--or-clair);
+    margin-bottom: .4rem;
+  }
+
+  /* ── Spinner ── */
+  .spinner {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 2px solid rgba(201,168,76,.3);
+    border-top-color: var(--or);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle;
+    margin-left: .6rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner.cache { display: none; }
+
+  /* ── Déplacements ── */
+  .deplacement-row {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    font-size: .88rem;
+    padding: .35rem 0;
+    border-bottom: 1px solid rgba(201,168,76,.08);
+  }
+  .deplacement-row:last-child { border: none; }
+  .arr { color: var(--or); }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="croix">✠</span>
+  <h1>Intentions de Messes</h1>
+</header>
+
+<div class="conteneur">
+
+  <div class="onglets">
+    <button class="onglet actif" data-section="inserer">Insérer</button>
+    <button class="onglet" data-section="calendrier">Calendrier</button>
+    <button class="onglet" data-section="date-libre">Date libre</button>
+    <button class="onglet" data-section="violations">Violations</button>
+  </div>
+
+  <!-- ── INSÉRER ── -->
+  <div class="section active" id="inserer">
+    <div class="titre-section">Nouvelle intention</div>
+    <form id="form-insertion">
+      <div class="grille">
+        <div class="champ" style="grid-column:1/-1">
+          <label>Nom de l'intention *</label>
+          <input type="text" id="nom" placeholder="ex. RIP - Jean Dupont ou Guérison de Marie" required>
+        </div>
+        <div class="champ">
+          <label>Demandeur</label>
+          <input type="text" id="demandeur" placeholder="ex. Mme Martin">
+        </div>
+        <div class="champ">
+          <label>Date souhaitée (laisser vide = prochaine libre)</label>
+          <input type="date" id="date_souhaitee">
+        </div>
+        <div class="champ" style="grid-column:1/-1">
+          <label>Description / note</label>
+          <textarea id="description" placeholder="Précision contextuelle (anniversaire, lien familial…)"></textarea>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-or">Insérer</button>
+        <span class="spinner cache" id="spin-inserer"></span>
+      </div>
+    </form>
+    <div class="message" id="msg-inserer"></div>
+  </div>
+
+  <!-- ── CALENDRIER ── -->
+  <div class="section" id="calendrier">
+    <div class="nav-mois">
+      <button class="btn btn-outline" id="mois-prev">←</button>
+      <h2 id="titre-mois">…</h2>
+      <button class="btn btn-outline" id="mois-next">→</button>
+      <span class="spinner cache" id="spin-cal"></span>
+    </div>
+    <div class="grille-cal" id="grille-cal"></div>
+  </div>
+
+  <!-- ── DATE LIBRE ── -->
+  <div class="section" id="date-libre">
+    <div class="titre-section">Trouver la prochaine date libre</div>
+    <div class="grille">
+      <div class="champ">
+        <label>Chercher à partir de</label>
+        <input type="date" id="dl-depuis">
+      </div>
+      <div class="champ">
+        <label>Durée (1 = simple, 9 = neuvaine, 30 = trentain)</label>
+        <input type="number" id="dl-duree" value="1" min="1" max="30">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-or" id="btn-dl">Chercher</button>
+      <span class="spinner cache" id="spin-dl"></span>
+    </div>
+    <div class="result-libre" id="result-libre"></div>
+  </div>
+
+  <!-- ── VIOLATIONS ── -->
+  <div class="section" id="violations">
+    <div class="titre-section">Violations de capacité</div>
+    <div class="btn-row" style="margin-bottom:1rem">
+      <button class="btn btn-or" id="btn-violations">Analyser la base</button>
+      <span class="spinner cache" id="spin-viol"></span>
+    </div>
+    <div id="liste-violations"></div>
+  </div>
+
+</div>
+
+<!-- ── POPUP JOUR ── -->
+<div class="popup-overlay" id="popup-overlay">
+  <div class="popup">
+    <h3 id="popup-titre">—</h3>
+    <ul class="liste-intentions" id="popup-intentions"></ul>
+    <div class="btn-row" style="margin-top:1rem">
+      <button class="btn btn-outline" onclick="fermerPopup()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── POPUP CONFIRMATION ── -->
+<div class="popup-overlay" id="popup-confirm">
+  <div class="popup">
+    <h3 id="confirm-titre">Confirmation</h3>
+    <div id="confirm-body" style="margin-bottom:1rem;line-height:1.6;font-size:.95rem;color:var(--texte2)"></div>
+    <div class="btn-row">
+      <button class="btn btn-or" id="confirm-ok">Confirmer</button>
+      <button class="btn btn-outline" onclick="fermerConfirm()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const MOIS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+let calMois = new Date().getMonth() + 1;
+let calAnnee = new Date().getFullYear();
+let dernierForm = null; // pour re-soumettre après confirmation
+
+// ── Onglets ────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.onglet').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.onglet').forEach(b => b.classList.remove('actif'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    btn.classList.add('actif');
+    document.getElementById(btn.dataset.section).classList.add('active');
+    if (btn.dataset.section === 'calendrier') chargerCal();
+  });
+});
+
+// ── Formulaire insertion ───────────────────────────────────────────────────────
+document.getElementById('form-insertion').addEventListener('submit', async e => {
+  e.preventDefault();
+  await soumettreForme(false);
+});
+
+async function soumettreForme(force = false) {
+  const spin = document.getElementById('spin-inserer');
+  const msg  = document.getElementById('msg-inserer');
+  spin.classList.remove('cache');
+  msg.className = 'message';
+
+  const body = {
+    nom: document.getElementById('nom').value.trim(),
+    demandeur: document.getElementById('demandeur').value.trim(),
+    description: document.getElementById('description').value.trim(),
+    date_souhaitee: document.getElementById('date_souhaitee').value || null,
+    force_date: force,
+  };
+
+  try {
+    const r = await fetch('/api/inserer', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+
+    if (r.status === 409) {
+      if (data.code === 'DATE_PASSEE') {
+        demanderConfirmation(
+          'Date dans le passé',
+          `La date <strong>${fmtDate(data.date)}</strong> est dans le passé. Confirmer l'insertion quand même ?`,
+          () => soumettreForme(true)
+        );
+      } else if (data.code === 'TROP_DEPLACEMENTS') {
+        const liste = data.intentions.map(i => `• ${i.nom} (${fmtDate(i.date)})`).join('<br>');
+        demanderConfirmation(
+          'Déplacements multiples',
+          `${data.intentions.length} intentions seront déplacées :<br><br>${liste}<br><br>Confirmer ?`,
+          () => soumettreForme(true)
+        );
+      } else {
+        afficherMsg('erreur', data.message || 'Erreur inconnue', 'msg-inserer');
+      }
+      return;
+    }
+
+    if (!r.ok) {
+      afficherMsg('erreur', data.detail || 'Erreur serveur', 'msg-inserer');
+      return;
+    }
+
+    // Succès
+    let html = `✠ Intention insérée : <strong>${data.intention.nom}</strong> — ${fmtDate(data.intention.date)}`;
+    if (data.deplacements.length) {
+      html += '<br><br>Déplacements effectués :';
+      data.deplacements.forEach(d => {
+        html += `<br><span class="arr">→</span> <em>${d.nom}</em> : ${fmtDate(d.ancienne_date)} → ${fmtDate(d.nouvelle_date)}`;
+      });
+    }
+    afficherMsg('succes', html, 'msg-inserer');
+    document.getElementById('form-insertion').reset();
+
+  } catch(err) {
+    afficherMsg('erreur', 'Erreur réseau : ' + err.message, 'msg-inserer');
+  } finally {
+    spin.classList.add('cache');
+  }
+}
+
+// ── Calendrier ─────────────────────────────────────────────────────────────────
+async function chargerCal() {
+  const spin = document.getElementById('spin-cal');
+  spin.classList.remove('cache');
+  document.getElementById('titre-mois').textContent = `${MOIS_FR[calMois-1]} ${calAnnee}`;
+  try {
+    const r = await fetch(`/api/calendrier?mois=${calMois}&annee=${calAnnee}`);
+    const data = await r.json();
+    renderCal(data.jours);
+  } catch(e) {
+    console.error(e);
+  } finally {
+    spin.classList.add('cache');
+  }
+}
+
+function renderCal(jours) {
+  const grille = document.getElementById('grille-cal');
+  grille.innerHTML = '';
+  const jSem = ['Lu','Ma','Me','Je','Ve','Sa','Di'];
+  jSem.forEach(j => {
+    const el = document.createElement('div');
+    el.className = 'entete-cal';
+    el.textContent = j;
+    grille.appendChild(el);
+  });
+
+  const aujourd = new Date().toISOString().split('T')[0];
+  const premier = new Date(jours[0].date);
+  // Lundi=0 … Dimanche=6  → décalage pour commencer au lundi
+  let decalage = (premier.getDay() + 6) % 7;
+  for (let i = 0; i < decalage; i++) {
+    const vide = document.createElement('div');
+    vide.className = 'jour-cal vide';
+    grille.appendChild(vide);
+  }
+
+  jours.forEach(j => {
+    const el = document.createElement('div');
+    el.className = 'jour-cal';
+    if (j.libre) el.classList.add('libre');
+    else if (j.violation) el.classList.add('violation');
+    else el.classList.add('plein');
+    if (j.date === aujourd) el.classList.add('aujourd-hui');
+
+    const num = document.createElement('span');
+    num.className = 'num-jour';
+    num.textContent = new Date(j.date + 'T00:00:00').getDate();
+    el.appendChild(num);
+
+    const cap = document.createElement('span');
+    cap.className = 'cap-indicator';
+    cap.textContent = `${j.count}/${j.capacite}`;
+    el.appendChild(cap);
+
+    j.intentions.slice(0, 2).forEach(int => {
+      const d = document.createElement('div');
+      d.className = 'intention-mini' + (int.fixe ? ' fixe' : '');
+      d.textContent = int.nom.replace(/^RIP - /, '✝ ');
+      el.appendChild(d);
+    });
+    if (j.intentions.length > 2) {
+      const plus = document.createElement('div');
+      plus.className = 'intention-mini';
+      plus.textContent = `+${j.intentions.length - 2}…`;
+      el.appendChild(plus);
+    }
+
+    el.addEventListener('click', () => ouvrirPopupJour(j));
+    grille.appendChild(el);
+  });
+}
+
+document.getElementById('mois-prev').addEventListener('click', () => {
+  calMois--; if (calMois < 1) { calMois = 12; calAnnee--; }
+  chargerCal();
+});
+document.getElementById('mois-next').addEventListener('click', () => {
+  calMois++; if (calMois > 12) { calMois = 1; calAnnee++; }
+  chargerCal();
+});
+
+// ── Popup jour ─────────────────────────────────────────────────────────────────
+function ouvrirPopupJour(j) {
+  document.getElementById('popup-titre').textContent =
+    `${fmtDate(j.date)} — ${j.count}/${j.capacite} intention${j.count > 1 ? 's' : ''}`;
+  const ul = document.getElementById('popup-intentions');
+  ul.innerHTML = '';
+  if (j.intentions.length === 0) {
+    ul.innerHTML = '<li style="color:var(--texte2);font-style:italic">Aucune intention</li>';
+  } else {
+    j.intentions.forEach(i => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="nom-int">${i.nom}</span>${i.fixe ? '<span class="fixe-badge">♦ fixe</span>' : ''}${i.periode ? '<span class="fixe-badge" style="background:rgba(39,174,96,.15);color:#6fcf97">période</span>' : ''}<br><span class="dem-int">${i.demandeur || '—'}</span>`;
+      ul.appendChild(li);
+    });
+  }
+  document.getElementById('popup-overlay').classList.add('visible');
+}
+function fermerPopup() {
+  document.getElementById('popup-overlay').classList.remove('visible');
+}
+document.getElementById('popup-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('popup-overlay')) fermerPopup();
+});
+
+// ── Date libre ─────────────────────────────────────────────────────────────────
+const aujourd = new Date().toISOString().split('T')[0];
+document.getElementById('dl-depuis').value = aujourd;
+
+document.getElementById('btn-dl').addEventListener('click', async () => {
+  const spin = document.getElementById('spin-dl');
+  const result = document.getElementById('result-libre');
+  spin.classList.remove('cache');
+  result.classList.remove('visible');
+  const depuis = document.getElementById('dl-depuis').value;
+  const duree  = parseInt(document.getElementById('dl-duree').value) || 1;
+  try {
+    const r = await fetch('/api/date-libre', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ depuis, duree }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      result.innerHTML = `<span style="color:#e57373">${data.detail}</span>`;
+    } else {
+      let html = `<div class="date-libre-val">${fmtDate(data.date)}</div>`;
+      html += `<div style="color:var(--texte2);font-size:.88rem">Capacité : ${data.capacite} — ${data.intentions_existantes.length} intention(s) existante(s)</div>`;
+      if (data.intentions_existantes.length) {
+        html += '<ul style="margin-top:.5rem;list-style:none">';
+        data.intentions_existantes.forEach(i => {
+          html += `<li style="font-size:.85rem;color:var(--texte2);padding:.2rem 0">• ${i.nom} <em>${i.demandeur ? '('+i.demandeur+')' : ''}</em></li>`;
+        });
+        html += '</ul>';
+      }
+      result.innerHTML = html;
+    }
+    result.classList.add('visible');
+  } catch(e) {
+    result.innerHTML = `<span style="color:#e57373">Erreur : ${e.message}</span>`;
+    result.classList.add('visible');
+  } finally {
+    spin.classList.add('cache');
+  }
+});
+
+// ── Violations ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-violations').addEventListener('click', async () => {
+  const spin = document.getElementById('spin-viol');
+  const liste = document.getElementById('liste-violations');
+  spin.classList.remove('cache');
+  liste.innerHTML = '';
+  try {
+    const r = await fetch('/api/violations');
+    const data = await r.json();
+    if (data.length === 0) {
+      liste.innerHTML = '<div class="message info visible">✓ Aucune violation détectée.</div>';
+    } else {
+      data.forEach(v => {
+        const div = document.createElement('div');
+        div.className = 'violation-item';
+        let html = `<div class="violation-date">${fmtDate(v.date)} — ${v.count} intention(s) pour une capacité de ${v.capacite}</div>`;
+        html += '<ul style="list-style:none">';
+        v.intentions.forEach(i => {
+          html += `<li style="font-size:.88rem;padding:.2rem 0;color:var(--texte2)">• ${i.nom} <em>${i.demandeur ? '('+i.demandeur+')' : ''}</em></li>`;
+        });
+        html += '</ul>';
+        div.innerHTML = html;
+        liste.appendChild(div);
+      });
+    }
+  } catch(e) {
+    liste.innerHTML = `<div class="message erreur visible">Erreur : ${e.message}</div>`;
+  } finally {
+    spin.classList.add('cache');
+  }
+});
+
+// ── Confirmation ────────────────────────────────────────────────────────────────
+let confirmCallback = null;
+function demanderConfirmation(titre, body, callback) {
+  document.getElementById('confirm-titre').textContent = titre;
+  document.getElementById('confirm-body').innerHTML = body;
+  confirmCallback = callback;
+  document.getElementById('popup-confirm').classList.add('visible');
+}
+document.getElementById('confirm-ok').addEventListener('click', () => {
+  fermerConfirm();
+  if (confirmCallback) confirmCallback();
+});
+function fermerConfirm() {
+  document.getElementById('popup-confirm').classList.remove('visible');
+  confirmCallback = null;
+}
+
+// ── Utilitaires ─────────────────────────────────────────────────────────────────
+function fmtDate(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${parseInt(d)} ${MOIS_FR[parseInt(m)-1]} ${y}`;
+}
+function afficherMsg(type, html, id) {
+  const el = document.getElementById(id);
+  el.className = `message ${type} visible`;
+  el.innerHTML = html;
+}
+</script>
+</body>
+</html>
