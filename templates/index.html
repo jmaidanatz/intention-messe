@@ -96,8 +96,16 @@
   .nav-btn.actif { color: var(--teal); border-bottom-color: var(--teal); font-weight: 600; }
 
   @media (max-width: 640px) {
-    nav { justify-content: flex-start; }
-    .nav-btn { font-size: .78rem; padding: .85rem 1.1rem; letter-spacing: .06em; }
+    nav { justify-content: stretch; }
+    .nav-btn {
+      font-size: .7rem;
+      padding: .85rem 0;
+      letter-spacing: .04em;
+      flex: 1;
+      justify-content: center;
+      text-align: center;
+      min-width: 0;
+    }
   }
 
   /* ── Wrap ── */
@@ -535,14 +543,18 @@ let calAnnee = today.getFullYear();
 const cache = {};
 
 // ── Onglets ──────────────────────────────────────────────────────────────────
+function naviguerVers(sectionId) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('actif'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  const btn = document.querySelector(`[data-section="${sectionId}"]`);
+  if (btn) btn.classList.add('actif');
+  const section = document.getElementById(sectionId);
+  if (section) section.classList.add('active');
+  if (sectionId === 'calendrier') afficherMois();
+}
+
 document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('actif'));
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    btn.classList.add('actif');
-    document.getElementById(btn.dataset.section).classList.add('active');
-    if (btn.dataset.section === 'calendrier') afficherMois();
-  });
+  btn.addEventListener('click', () => naviguerVers(btn.dataset.section));
 });
 
 // ── Cache ────────────────────────────────────────────────────────────────────
@@ -880,47 +892,77 @@ prechargerTout();
 // ── Notifications push ────────────────────────────────────────────────────────
 const btnNotif = document.getElementById('btn-notif');
 let vapidPublicKey = null;
+let notifInitialise = false;
+
+// Attacher le listener UNE SEULE FOIS dès le départ
+btnNotif.addEventListener('click', toggleNotifications);
 
 async function initNotifications() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+  // Support push disponible ?
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     btnNotif.style.display = 'none';
     return;
   }
-  // Charger la clé publique VAPID
+  // Charger la clé VAPID (ne masquer le bouton qu'en cas d'erreur définitive)
   try {
     const r = await fetch('/api/push/vapid-public-key');
-    if (!r.ok) { btnNotif.style.display = 'none'; return; }
-    const data = await r.json();
-    vapidPublicKey = data.publicKey;
-  } catch { btnNotif.style.display = 'none'; return; }
+    if (r.ok) {
+      vapidPublicKey = (await r.json()).publicKey;
+    }
+    // Si erreur réseau, on laisse le bouton visible — l'erreur sera gérée au clic
+  } catch { /* laisser le bouton visible */ }
 
-  // État initial
   await majEtatBoutonNotif();
-  btnNotif.addEventListener('click', toggleNotifications);
+  notifInitialise = true;
 }
 
 async function majEtatBoutonNotif() {
-  const perm = Notification.permission;
-  const r = await fetch('/api/push/status').catch(() => null);
-  const actif = r && r.ok ? (await r.json()).actif : false;
-  if (perm === 'granted' && actif) {
-    btnNotif.classList.add('actif');
-    btnNotif.title = 'Notifications actives — cliquer pour désactiver';
-    btnNotif.textContent = '🔔 Actif';
-  } else {
-    btnNotif.classList.remove('actif');
-    btnNotif.title = 'Activer les notifications du matin (6h45)';
-    btnNotif.textContent = '🔔';
-  }
+  try {
+    const perm = Notification.permission;
+    const r = await fetch('/api/push/status').catch(() => null);
+    const actif = r && r.ok ? (await r.json()).actif : false;
+    if (perm === 'granted' && actif) {
+      btnNotif.classList.add('actif');
+      btnNotif.title = 'Notifications actives — cliquer pour désactiver';
+      btnNotif.innerHTML = '🔔 Actif';
+    } else {
+      btnNotif.classList.remove('actif');
+      btnNotif.title = 'Activer les notifications du matin (6h45)';
+      btnNotif.innerHTML = '🔔';
+    }
+  } catch(e) { console.warn('majEtatBoutonNotif:', e); }
 }
 
 async function toggleNotifications() {
-  const perm = Notification.permission;
-  const statusR = await fetch('/api/push/status').catch(() => null);
-  const actif = statusR && statusR.ok ? (await statusR.json()).actif : false;
+  // Vérifier le support
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    afficherMsg('erreur', 'Votre navigateur ne supporte pas les notifications push.', 'msg-inserer');
+    naviguerVers('inserer');
+    return;
+  }
 
+  // Charger la clé si pas encore fait
+  if (!vapidPublicKey) {
+    try {
+      const r = await fetch('/api/push/vapid-public-key');
+      if (!r.ok) throw new Error('Clé VAPID indisponible (statut ' + r.status + ')');
+      vapidPublicKey = (await r.json()).publicKey;
+    } catch(e) {
+      afficherMsg('erreur', 'Impossible de charger la configuration : ' + e.message, 'msg-inserer');
+      naviguerVers('inserer');
+      return;
+    }
+  }
+
+  const perm = Notification.permission;
+  let actif = false;
+  try {
+    const sr = await fetch('/api/push/status');
+    if (sr.ok) actif = (await sr.json()).actif;
+  } catch { /* actif reste false */ }
+
+  // ── Désactiver ──
   if (perm === 'granted' && actif) {
-    // Désactiver
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
@@ -928,41 +970,47 @@ async function toggleNotifications() {
       await fetch('/api/push/subscribe', { method: 'DELETE' });
       await majEtatBoutonNotif();
       afficherMsg('info', 'Notifications désactivées.', 'msg-inserer');
-    } catch(e) { afficherMsg('erreur', 'Erreur : ' + e.message, 'msg-inserer'); }
+    } catch(e) {
+      afficherMsg('erreur', 'Erreur désactivation : ' + e.message, 'msg-inserer');
+    }
+    naviguerVers('inserer');
     return;
   }
 
-  // Activer
+  // ── Activer ──
   if (perm === 'denied') {
-    alert('Les notifications sont bloquées par le navigateur. Autorisez-les dans les réglages du site.');
+    alert('Les notifications sont bloquées. Autorisez-les dans Chrome → Paramètres du site → Notifications.');
     return;
   }
   try {
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') { afficherMsg('info', 'Notifications refusées.', 'msg-inserer'); return; }
-
+    if (permission !== 'granted') {
+      afficherMsg('info', 'Permission de notification refusée.', 'msg-inserer');
+      naviguerVers('inserer');
+      return;
+    }
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
     });
-    const subJson = sub.toJSON();
     await fetch('/api/push/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(subJson),
+      body: JSON.stringify(sub.toJSON()),
     });
     await majEtatBoutonNotif();
-    // Test immédiat
     const testR = await fetch('/api/push/test', { method: 'POST' });
     if (testR.ok) {
       afficherMsg('succes', '✓ Notifications activées. Une notification de test vient d'être envoyée.', 'msg-inserer');
     } else {
-      afficherMsg('info', 'Abonnement enregistré. Vérifiez que VAPID_PUBLIC_KEY et VAPID_PRIVATE_KEY sont configurées sur Railway.', 'msg-inserer');
+      const err = await testR.json().catch(() => ({}));
+      afficherMsg('info', 'Abonnement enregistré mais envoi échoué : ' + (err.detail || 'vérifiez les clés VAPID sur Railway.'), 'msg-inserer');
     }
-    // Naviguer vers l'onglet Insérer pour voir le message
-    document.querySelector('[data-section="inserer"]').click();
-  } catch(e) { afficherMsg('erreur', 'Erreur : ' + e.message, 'msg-inserer'); }
+  } catch(e) {
+    afficherMsg('erreur', 'Erreur activation : ' + e.message, 'msg-inserer');
+  }
+  naviguerVers('inserer');
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -972,9 +1020,14 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
-// Init après chargement du SW
+// Init : attendre que le SW soit prêt, puis initialiser
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.ready.then(() => initNotifications());
+  navigator.serviceWorker.register('/sw.js')
+    .then(reg => reg.update())
+    .catch(() => {});
+  navigator.serviceWorker.ready
+    .then(() => initNotifications())
+    .catch(() => initNotifications());
 } else {
   initNotifications();
 }
