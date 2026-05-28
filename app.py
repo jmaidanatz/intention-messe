@@ -15,6 +15,7 @@ from typing import Optional
 
 app = FastAPI(title="Intentions de Messes")
 templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 NOTION_TOKEN  = os.environ.get("NOTION_TOKEN", "")
@@ -235,6 +236,18 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/sw.js")
+async def service_worker():
+    from fastapi.responses import FileResponse
+    return FileResponse("static/sw.js", media_type="application/javascript")
+
+
+@app.get("/manifest.json")
+async def manifest():
+    from fastapi.responses import FileResponse
+    return FileResponse("static/manifest.json", media_type="application/manifest+json")
+
+
 @app.get("/api/diagnostic")
 async def diagnostic():
     token_ok = bool(NOTION_TOKEN)
@@ -452,7 +465,12 @@ async def api_inserer(req: InsertionRequest):
 
     # ── 5. Créer ──
     nom_final = nom
-    if date_precise and not nom_final.rstrip().endswith("♦"):
+    # Suffixe période : neuvaine (9 j) → 9️⃣, trentain (30 j) → 🪦
+    if duree_bloc == 9:
+        nom_final = f"{nom_final} 9️⃣"
+    elif duree_bloc == 30:
+        nom_final = f"{nom_final} 🪦"
+    if date_precise and not nom_final.rstrip("️⃣🪦 ").endswith("♦"):
         nom_final = f"{nom_final} ♦"
 
     await notion_create(
@@ -526,3 +544,202 @@ async def api_calendrier(mois: int, annee: int):
         })
         cur += timedelta(days=1)
     return {"mois": mois, "annee": annee, "jours": jours}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NOTIFICATIONS PUSH
+# ══════════════════════════════════════════════════════════════════════════════
+import json
+import asyncio
+import logging
+from pathlib import Path
+from pywebpush import webpush, WebPushException
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import pytz
+
+logger = logging.getLogger(__name__)
+
+# ── Config VAPID ──────────────────────────────────────────────────────────────
+VAPID_PUBLIC_KEY  = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_EMAIL       = os.environ.get("VAPID_EMAIL", "admin@example.com")
+
+# Fichier de stockage de l'abonnement (un seul abonné)
+DATA_DIR = Path("data")
+SUB_FILE = DATA_DIR / "subscription.json"
+DATA_DIR.mkdir(exist_ok=True)
+
+PARIS = pytz.timezone("Europe/Paris")
+
+
+# ── Helpers subscription ──────────────────────────────────────────────────────
+def lire_subscription() -> dict | None:
+    if SUB_FILE.exists():
+        try:
+            return json.loads(SUB_FILE.read_text())
+        except Exception:
+            return None
+    return None
+
+
+def sauver_subscription(sub: dict) -> None:
+    SUB_FILE.write_text(json.dumps(sub, ensure_ascii=False, indent=2))
+
+
+def supprimer_subscription() -> None:
+    if SUB_FILE.exists():
+        SUB_FILE.unlink()
+
+
+# ── Envoi d'une notification ──────────────────────────────────────────────────
+def envoyer_notification(subscription: dict, titre: str, corps: str) -> bool:
+    if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+        logger.warning("VAPID keys absentes — notification non envoyée")
+        return False
+    try:
+        webpush(
+            subscription_info=subscription,
+            data=json.dumps({
+                "title": titre,
+                "body":  corps,
+                "icon":  "/static/icon-192.png",
+                "badge": "/static/icon-192.png",
+            }),
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_claims={"sub": f"mailto:{VAPID_EMAIL}"},
+        )
+        return True
+    except WebPushException as e:
+        logger.error("Push error: %s", e)
+        # Abonnement expiré ou révoqué
+        if e.response and e.response.status_code in (404, 410):
+            supprimer_subscription()
+        return False
+    except Exception as e:
+        logger.error("Push unexpected error: %s", e)
+        return False
+
+
+# ── Tâche quotidienne ─────────────────────────────────────────────────────────
+async def tache_notification_matin():
+    """Envoyée chaque matin à 6h45 (Europe/Paris)."""
+    sub = lire_subscription()
+    if not sub:
+        return  # Pas d'abonné
+
+    aujourd = date.today()
+    try:
+        intentions = await fetch_all_intentions()
+    except Exception as e:
+        logger.error("Notification: impossible de charger Notion: %s", e)
+        return
+
+    map_jour = build_map_jour(intentions)
+    occs = map_jour.get(aujourd, [])
+
+    MOIS = ['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']
+    date_str = f"{aujourd.day} {MOIS[aujourd.month - 1]} {aujourd.year}"
+
+    if not occs:
+        titre = f"Intentions — {date_str}"
+        corps = "Aucune intention de Messe aujourd'hui."
+    else:
+        titre = f"{len(occs)} intention{'s' if len(occs) > 1 else ''} — {date_str}"
+        lignes = []
+        for o in occs:
+            dem = f" ({o['demandeur']})" if o['demandeur'] else ""
+            lignes.append(f"• {o['nom']}{dem}")
+        corps = "\n".join(lignes)
+
+    envoyer_notification(sub, titre, corps)
+
+
+# ── Scheduler ─────────────────────────────────────────────────────────────────
+scheduler = AsyncIOScheduler(timezone=PARIS)
+scheduler.add_job(
+    tache_notification_matin,
+    trigger="cron",
+    hour=6,
+    minute=45,
+    id="notif_matin",
+    replace_existing=True,
+)
+
+
+@app.on_event("startup")
+async def startup():
+    scheduler.start()
+    logger.info("Scheduler démarré — notifications à 6h45 Europe/Paris")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    scheduler.shutdown(wait=False)
+
+
+# ── Routes push ───────────────────────────────────────────────────────────────
+class PushSubscription(BaseModel):
+    endpoint:  str
+    keys:      dict
+    expirationTime: Optional[float] = None
+
+
+@app.get("/api/push/vapid-public-key")
+async def get_vapid_public_key():
+    """Retourne la clé publique VAPID pour le frontend."""
+    if not VAPID_PUBLIC_KEY:
+        raise HTTPException(500, "VAPID_PUBLIC_KEY non configurée.")
+    return {"publicKey": VAPID_PUBLIC_KEY}
+
+
+@app.post("/api/push/subscribe")
+async def push_subscribe(sub: PushSubscription):
+    """Enregistre ou met à jour l'abonnement push."""
+    sauver_subscription({
+        "endpoint":       sub.endpoint,
+        "keys":           sub.keys,
+        "expirationTime": sub.expirationTime,
+    })
+    return {"ok": True, "message": "Abonnement enregistré."}
+
+
+@app.delete("/api/push/subscribe")
+async def push_unsubscribe():
+    """Supprime l'abonnement push."""
+    supprimer_subscription()
+    return {"ok": True, "message": "Abonnement supprimé."}
+
+
+@app.get("/api/push/status")
+async def push_status():
+    """Indique si un abonnement est actif."""
+    sub = lire_subscription()
+    return {"actif": sub is not None, "endpoint_prefix": sub["endpoint"][:40] + "..." if sub else None}
+
+
+@app.post("/api/push/test")
+async def push_test():
+    """Envoie une notification de test immédiate."""
+    sub = lire_subscription()
+    if not sub:
+        raise HTTPException(400, "Aucun abonnement enregistré. Activez d'abord les notifications.")
+    aujourd = date.today()
+    MOIS = ['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']
+    date_str = f"{aujourd.day} {MOIS[aujourd.month - 1]} {aujourd.year}"
+    try:
+        intentions = await fetch_all_intentions()
+        map_jour   = build_map_jour(intentions)
+        occs       = map_jour.get(aujourd, [])
+    except Exception:
+        occs = []
+    if not occs:
+        titre = f"Intentions — {date_str}"
+        corps = "Aucune intention de Messe aujourd'hui."
+    else:
+        titre = f"{len(occs)} intention{'s' if len(occs) > 1 else ''} — {date_str}"
+        lignes = [f"• {o['nom']}" + (f" ({o['demandeur']})" if o['demandeur'] else "") for o in occs]
+        corps  = "\n".join(lignes)
+    ok = envoyer_notification(sub, titre, corps)
+    if not ok:
+        raise HTTPException(500, "Échec de l'envoi. Vérifiez les clés VAPID.")
+    return {"ok": True}
