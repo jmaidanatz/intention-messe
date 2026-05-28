@@ -19,7 +19,7 @@ templates = Jinja2Templates(directory="templates")
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
-NOTION_DS_ID = "2d183ba0-7414-805f-8c10-000b39b1934d"
+NOTION_DS_ID = "2d183ba0-7414-8018-ae4d-fee6db4c950d"
 NOTION_VIEW_URL = "https://www.notion.so/2d183ba074148018ae4dfee6db4c950d"
 NOTION_API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
