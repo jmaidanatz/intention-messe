@@ -37,16 +37,14 @@ def notion_headers():
 
 async def fetch_all_intentions() -> list[dict]:
     """Charge toutes les intentions depuis Notion avec pagination complète."""
+    if not NOTION_TOKEN:
+        raise HTTPException(status_code=500, detail="NOTION_TOKEN absent. Vérifiez les variables d'environnement Railway.")
     results = []
     cursor = None
     async with httpx.AsyncClient(timeout=30) as client:
         while True:
             body = {
                 "page_size": 100,
-                "filter": {
-                    "property": "Date",
-                    "date": {"is_not_empty": True}
-                },
                 "sorts": [{"property": "Date", "direction": "ascending"}],
             }
             if cursor:
@@ -56,7 +54,11 @@ async def fetch_all_intentions() -> list[dict]:
                 headers=notion_headers(),
                 json=body,
             )
-            r.raise_for_status()
+            if not r.is_success:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Notion API {r.status_code} : {r.text[:300]}"
+                )
             data = r.json()
             for page in data.get("results", []):
                 props = page.get("properties", {})
@@ -256,6 +258,40 @@ class DateLibreRequest(BaseModel):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/api/diagnostic")
+async def diagnostic():
+    """Vérifie la connexion Notion et liste les propriétés de la base."""
+    token_ok = bool(NOTION_TOKEN)
+    result = {
+        "token_present": token_ok,
+        "token_prefix": NOTION_TOKEN[:12] + "..." if token_ok else None,
+        "database_id": NOTION_DS_ID,
+    }
+    if not token_ok:
+        result["erreur"] = "NOTION_TOKEN absent ou vide"
+        return result
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(
+                f"{NOTION_API}/databases/{NOTION_DS_ID}",
+                headers=notion_headers(),
+            )
+            result["status_http"] = r.status_code
+            if r.status_code == 200:
+                data = r.json()
+                result["database_title"] = "".join(
+                    t.get("plain_text", "") for t in data.get("title", [])
+                )
+                result["proprietes"] = {
+                    k: v.get("type") for k, v in data.get("properties", {}).items()
+                }
+            else:
+                result["erreur_notion"] = r.text[:300]
+    except Exception as e:
+        result["exception"] = str(e)
+    return result
 
 
 @app.get("/api/intentions")
