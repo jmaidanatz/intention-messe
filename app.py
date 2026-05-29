@@ -7,6 +7,8 @@ Cache serveur centralisé pour minimiser les appels Notion.
 import os
 import time
 import json
+import hmac
+import hashlib
 import asyncio
 import logging
 from pathlib import Path
@@ -15,8 +17,8 @@ from functools import lru_cache
 from typing import Optional
 
 import httpx
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -37,6 +39,45 @@ CACHE_TTL    = 300           # secondes : durée de vie du cache des intentions
 VAPID_PUBLIC_KEY  = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
 VAPID_EMAIL       = os.environ.get("VAPID_EMAIL", "admin@example.com")
+
+APP_USERNAME = os.environ.get("APP_USERNAME", "")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+# Clé de signature des cookies (dérivée du mot de passe, stable entre redémarrages)
+_COOKIE_SECRET = hashlib.sha256(
+    (APP_PASSWORD + APP_USERNAME + "intentions-messe-cookie").encode()
+).hexdigest()
+COOKIE_NAME    = "im_session"
+COOKIE_MAX_AGE = 60 * 60 * 24 * 30   # 30 jours
+
+
+def _signer_token(username: str) -> str:
+    """Génère un token signé HMAC : username|timestamp|signature."""
+    ts = str(int(time.time()))
+    msg = f"{username}|{ts}"
+    sig = hmac.new(_COOKIE_SECRET.encode(), msg.encode(), hashlib.sha256).hexdigest()
+    return f"{msg}|{sig}"
+
+
+def _verifier_token(token: str) -> bool:
+    """Vérifie la signature du cookie. Pas d'expiration (le TTL est côté navigateur)."""
+    try:
+        parts = token.split("|")
+        if len(parts) != 3:
+            return False
+        username, ts, sig = parts
+        msg = f"{username}|{ts}"
+        expected = hmac.new(_COOKIE_SECRET.encode(), msg.encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected, sig)
+    except Exception:
+        return False
+
+
+def _est_authentifie(request: Request) -> bool:
+    """Retourne True si la requête porte un cookie de session valide."""
+    if not APP_USERNAME or not APP_PASSWORD:
+        return True   # Pas de protection configurée → accès libre
+    token = request.cookies.get(COOKIE_NAME, "")
+    return bool(token) and _verifier_token(token)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -357,8 +398,9 @@ class PushSubscription(BaseModel):
 # ROUTES — PAGES
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/", response_class=HTMLResponse)
-async def index():
-    # Aucune variable Jinja dans le HTML : on sert le fichier directement.
+async def index(request: Request):
+    if not _est_authentifie(request):
+        return RedirectResponse("/login", status_code=302)
     return FileResponse("templates/index.html", media_type="text/html")
 
 
@@ -373,10 +415,96 @@ async def manifest():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ROUTES — AUTH
+# ══════════════════════════════════════════════════════════════════════════════
+@app.get("/login", response_class=HTMLResponse)
+async def page_login(request: Request, erreur: str = ""):
+    if _est_authentifie(request):
+        return RedirectResponse("/", status_code=302)
+    err_html = f'<p class="err">{erreur}</p>' if erreur else ""
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connexion — Intentions de Messes</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{min-height:100vh;display:flex;align-items:center;justify-content:center;
+        background:#111a1e;font-family:'DM Sans',system-ui,sans-serif;padding:1rem}}
+  .card{{background:#1e2d34;border:1px solid #2a3f48;border-radius:8px;
+         padding:2.4rem 2rem;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)}}
+  .logo{{display:flex;align-items:center;gap:.8rem;margin-bottom:2rem}}
+  .logo img{{width:40px;height:40px;border-radius:5px}}
+  .logo h1{{font-family:'Cormorant Garamond',Georgia,serif;font-size:1.2rem;
+            font-weight:600;color:#e8dfd0;letter-spacing:.02em}}
+  label{{display:block;font-size:.72rem;font-weight:600;color:#9fb5be;
+         letter-spacing:.07em;text-transform:uppercase;margin-bottom:.4rem}}
+  input{{width:100%;background:#111a1e;border:1px solid #2a3f48;border-radius:4px;
+         color:#e8dfd0;font-family:inherit;font-size:.95rem;padding:.6rem .85rem;
+         outline:none;margin-bottom:1rem;transition:.18s}}
+  input:focus{{border-color:#4a9cb5;box-shadow:0 0 0 3px rgba(74,156,181,.12)}}
+  button{{width:100%;background:#1d4e5f;border:none;border-radius:4px;color:#fff;
+          font-family:inherit;font-size:.78rem;font-weight:600;letter-spacing:.08em;
+          text-transform:uppercase;padding:.65rem;cursor:pointer;transition:.18s;margin-top:.4rem}}
+  button:hover{{background:#266070}}
+  .err{{color:#e08090;font-size:.85rem;margin-bottom:1rem;text-align:center}}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet">
+</head><body>
+<div class="card">
+  <div class="logo">
+    <img src="/static/icon-192.png" alt="">
+    <h1>Intentions de Messes</h1>
+  </div>
+  {err_html}
+  <form method="post" action="/login">
+    <label>Identifiant</label>
+    <input type="text" name="username" autocomplete="username" autofocus required>
+    <label>Mot de passe</label>
+    <input type="password" name="password" autocomplete="current-password" required>
+    <button type="submit">Se connecter</button>
+  </form>
+</div>
+</body></html>""")
+
+
+@app.post("/login")
+async def post_login(request: Request):
+    form = await request.form()
+    username = form.get("username", "").strip()
+    password = form.get("password", "")
+    if not APP_USERNAME or not APP_PASSWORD:
+        # Pas de protection configurée
+        resp = RedirectResponse("/", status_code=302)
+        return resp
+    if username != APP_USERNAME or password != APP_PASSWORD:
+        return RedirectResponse("/login?erreur=Identifiants+incorrects", status_code=302)
+    token = _signer_token(username)
+    resp = RedirectResponse("/", status_code=302)
+    resp.set_cookie(
+        COOKIE_NAME, token,
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="strict",
+        secure=True,   # HTTPS uniquement (Railway fournit HTTPS)
+    )
+    return resp
+
+
+@app.get("/logout")
+async def logout():
+    resp = RedirectResponse("/login", status_code=302)
+    resp.delete_cookie(COOKIE_NAME)
+    return resp
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ROUTES — DIAGNOSTIC
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/api/diagnostic")
-async def diagnostic():
+async def diagnostic(request: Request):
+    if not _est_authentifie(request):
+        raise HTTPException(401, "Non authentifié")
     token_ok = bool(NOTION_TOKEN)
     result: dict = {
         "token_present":         token_ok,
@@ -411,7 +539,8 @@ async def diagnostic():
 # ROUTES — DONNÉES
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/api/intentions")
-async def api_intentions():
+async def api_intentions(request: Request):
+    if not _est_authentifie(request): raise HTTPException(401, "Non authentifié")
     intentions = await fetch_all_intentions()
     return [{
         "id":          i["id"],
@@ -426,7 +555,7 @@ async def api_intentions():
 
 
 @app.get("/api/calendrier")
-async def api_calendrier(mois: int, annee: int, forcer: bool = False):
+async def api_calendrier(request: Request, mois: int, annee: int, forcer: bool = False):
     """Un mois. Utilise le cache serveur (pas de rechargement Notion sauf si expiré)."""
     intentions = await fetch_all_intentions(forcer=forcer)
     map_jour   = build_map_jour(intentions)
@@ -441,7 +570,8 @@ async def api_calendrier(mois: int, annee: int, forcer: bool = False):
 
 
 @app.get("/api/calendrier-plage")
-async def api_calendrier_plage(forcer: bool = False):
+async def api_calendrier_plage(request: Request, forcer: bool = False):
+    if not _est_authentifie(request): raise HTTPException(401, "Non authentifié")
     """Retourne TOUS les mois de -3 à +11 en UN SEUL appel.
     Le cache serveur fait qu'un seul chargement Notion est nécessaire."""
     intentions = await fetch_all_intentions(forcer=forcer)
@@ -466,7 +596,8 @@ async def api_calendrier_plage(forcer: bool = False):
 
 
 @app.post("/api/date-libre")
-async def api_date_libre(req: DateLibreRequest):
+async def api_date_libre(request: Request, req: DateLibreRequest):
+    if not _est_authentifie(request): raise HTTPException(401, "Non authentifié")
     try:
         depuis = date.fromisoformat(req.depuis)
     except ValueError:
@@ -487,12 +618,14 @@ async def api_date_libre(req: DateLibreRequest):
 
 
 @app.get("/api/violations")
-async def api_violations():
+async def api_violations(request: Request):
+    if not _est_authentifie(request): raise HTTPException(401, "Non authentifié")
     return detect_violations(await fetch_all_intentions())
 
 
 @app.post("/api/violations/corriger")
-async def api_corriger_violations():
+async def api_corriger_violations(request: Request):
+    if not _est_authentifie(request): raise HTTPException(401, "Non authentifié")
     """
     Pour chaque violation future :
     - identifie les intentions déplaçables (sans ♦, non inamovibles)
@@ -591,7 +724,8 @@ async def api_corriger_violations():
 
 
 @app.post("/api/inserer")
-async def api_inserer(req: InsertionRequest):
+async def api_inserer(request: Request, req: InsertionRequest):
+    if not _est_authentifie(request): raise HTTPException(401, "Non authentifié")
     today = date.today()
 
     # Validation entrée
@@ -748,7 +882,8 @@ async def api_inserer(req: InsertionRequest):
 
 
 @app.post("/api/rafraichir")
-async def api_rafraichir():
+async def api_rafraichir(request: Request):
+    if not _est_authentifie(request): raise HTTPException(401, "Non authentifié")
     """Force le rechargement du cache depuis Notion."""
     await fetch_all_intentions(forcer=True)
     return {"ok": True}
