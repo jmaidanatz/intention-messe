@@ -263,24 +263,24 @@ def _trouver_plus_proche(jour: date, map_jour: dict, duree: int, today: date,
             if candidate < today:
                 continue
             if duree == 1:
-                if est_libre(candidate, map_jour):
+                # Valide si la capacité n'est pas saturée par des ♦/inamovibles
+                cap = capacite(candidate)
+                bloques = [o for o in map_jour.get(candidate, [])
+                           if o["fixe"] or est_inamovible(o, today)]
+                if len(bloques) < cap:
                     return candidate
             else:
-                # Vérifier que tout le bloc est libre et sans inamovibles/♦
                 ok = True
                 for offset in range(duree):
                     j = candidate + timedelta(days=offset)
-                    for occ in map_jour.get(j, []):
-                        if occ["fixe"] or est_inamovible(occ, today):
-                            ok = False
-                            break
-                    if not ok:
+                    cap_j = capacite(j)
+                    bloques_j = [o for o in map_jour.get(j, [])
+                                 if o["fixe"] or est_inamovible(o, today)]
+                    if len(bloques_j) >= cap_j:
+                        ok = False
                         break
                 if ok:
-                    # Vérifier aussi la capacité pour chaque jour du bloc
-                    if all(est_libre(candidate + timedelta(days=o), map_jour)
-                           for o in range(duree)):
-                        return candidate
+                    return candidate
     return None
 
 
