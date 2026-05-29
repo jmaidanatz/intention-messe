@@ -1,32 +1,38 @@
-// v3 — force le rechargement du cache
-const CACHE = 'intentions-v3';
+// v4 — icônes servies en fichiers, icône notification monochrome
+const CACHE = 'intentions-v4';
+const STATIC_ASSETS = [
+  '/static/icon-192.png',
+  '/static/icon-512.png',
+  '/static/icon-notif-96.png',
+];
 
 self.addEventListener('install', e => {
-  // Ne pas précacher — évite de servir du HTML périmé
+  // Précacher les icônes statiques (pas le HTML)
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(STATIC_ASSETS))
+  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
-  // Supprimer TOUS les anciens caches
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
-  // Toujours réseau en premier, jamais de cache pour le HTML
   if (e.request.url.includes('/api/')) return;
+  // HTML : toujours réseau
   if (e.request.mode === 'navigate') {
-    // Page HTML : toujours depuis le réseau
     e.respondWith(fetch(e.request));
     return;
   }
-  // Autres assets : réseau avec fallback cache
+  // Assets statiques : cache d'abord
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    caches.match(e.request).then(cached => cached || fetch(e.request))
   );
 });
 
@@ -40,7 +46,7 @@ self.addEventListener('push', e => {
     self.registration.showNotification(payload.title, {
       body:    payload.body,
       icon:    payload.icon  || '/static/icon-192.png',
-      badge:   payload.badge || '/static/icon-192.png',
+      badge:   payload.badge || '/static/icon-notif-96.png',
       vibrate: [200, 100, 200],
       tag:     'intentions-matin',
       renotify: false,

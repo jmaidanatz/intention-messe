@@ -786,7 +786,8 @@ def _envoyer_une(subscription: dict, titre: str, corps: str) -> tuple[bool, str]
         webpush(
             subscription_info=subscription,
             data=json.dumps({"title": titre, "body": corps,
-                             "icon": "/static/icon-192.png", "badge": "/static/icon-192.png"}),
+                             "icon": "/static/icon-192.png",
+                             "badge": "/static/icon-notif-96.png"}),
             vapid_private_key=VAPID_PRIVATE_KEY,
             vapid_claims={"sub": f"mailto:{VAPID_EMAIL}"},
         )
