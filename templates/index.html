@@ -33,38 +33,6 @@
     --trans:     .18s ease;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --fond:    #111a1e;
-      --fond2:   #1a262c;
-      --blanc:   #1e2d34;
-      --teal:    #4a9cb5;
-      --teal2:   #5ab0cc;
-      --or:      #d4a84b;
-      --texte:   #e8dfd0;
-      --texte2:  #9fb5be;
-      --texte3:  #5e7a85;
-      --bordure: #2a3f48;
-      --vert:    #4aaa7a;
-      --rouge:   #d9566a;
-      --shadow:  0 1px 3px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.2);
-    }
-    /* Corrections spécifiques dark */
-    .message.succes { background: #0d2e1a; border-color: #2a6040; color: #7ecfa0; }
-    .message.erreur { background: #2e0d10; border-color: #6b2030; color: #e08090; }
-    .message.info   { background: #2a2010; border-color: #6b5020; color: #d4a84b; }
-    .violation-item { background: #2e1015; border-color: #6b2030; color: var(--texte2); }
-    .violation-date { color: #e08090; }
-    .result-libre   { background: var(--blanc); }
-    .jour-cal.aujourd-hui { background: #1a2d36; }
-    .jour-cal.violation   { background: #2e1015; border-color: #6b2030; }
-    .badge-fixe    { background: #2a2010; border-color: #6b5020; }
-    .badge-periode { background: #0d2e1a; border-color: #2a6040; }
-    .planning-jour:active { background: #1a262c; }
-    /* Alertes dans le popup et les résultats */
-    .popup { background: var(--blanc); }
-    .liste-intentions li { border-bottom-color: var(--fond2); }
-  }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     background: var(--fond);
@@ -418,6 +386,39 @@
   .spinner { display: inline-block; width: 14px; height: 14px; border: 1.5px solid var(--bordure); border-top-color: var(--teal); border-radius: 50%; animation: spin .65s linear infinite; }
   .spinner.cache { display: none; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond:    #111a1e;
+      --fond2:   #1a262c;
+      --blanc:   #1e2d34;
+      --teal:    #4a9cb5;
+      --teal2:   #5ab0cc;
+      --or:      #d4a84b;
+      --texte:   #e8dfd0;
+      --texte2:  #9fb5be;
+      --texte3:  #5e7a85;
+      --bordure: #2a3f48;
+      --vert:    #4aaa7a;
+      --rouge:   #d9566a;
+      --shadow:  0 1px 3px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.2);
+    }
+    /* Corrections spécifiques dark */
+    .message.succes { background: #0d2e1a; border-color: #2a6040; color: #7ecfa0; }
+    .message.erreur { background: #2e0d10; border-color: #6b2030; color: #e08090; }
+    .message.info   { background: #2a2010; border-color: #6b5020; color: #d4a84b; }
+    .violation-item { background: #2e1015; border-color: #6b2030; color: var(--texte2); }
+    .violation-date { color: #e08090; }
+    .result-libre   { background: var(--blanc); }
+    .jour-cal.aujourd-hui { background: #1a2d36; }
+    .jour-cal.violation   { background: #2e1015; border-color: #6b2030; }
+    .badge-fixe    { background: #2a2010; border-color: #6b5020; }
+    .badge-periode { background: #0d2e1a; border-color: #2a6040; }
+    .planning-jour:active { background: #1a262c; }
+    /* Alertes dans le popup et les résultats */
+    .popup { background: var(--blanc); }
+    .liste-intentions li { border-bottom-color: var(--fond2); }
+  }
 </style>
 </head>
 <body>
