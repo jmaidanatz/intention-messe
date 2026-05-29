@@ -842,31 +842,28 @@ function afficherMsg(type, html, id) {
 }
 
 
-// ── PWA ──────────────────────────────────────────────────────────────────────
-// Enregistrement du service worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
-}
 
-// Détection iOS
+// ── PWA & Notifications ───────────────────────────────────────────────────────
+// Un seul enregistrement du SW, sans double appel
+(function() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+})();
+
+// Bouton installer
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches
   || window.navigator.standalone === true;
-
 let deferredPrompt = null;
 const btnInstall = document.getElementById('btn-install');
 
-if (!isInStandaloneMode) {
+if (btnInstall && !isStandalone) {
   if (isIOS) {
-    // Sur iOS : afficher le bouton qui ouvre le popup d'instructions
     btnInstall.classList.add('visible');
     btnInstall.addEventListener('click', () => {
       document.getElementById('ios-popup').classList.add('visible');
     });
   } else {
-    // Chrome/Edge/Android : écouter beforeinstallprompt
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
       deferredPrompt = e;
@@ -879,7 +876,6 @@ if (!isInStandaloneMode) {
       deferredPrompt = null;
       if (outcome === 'accepted') btnInstall.classList.remove('visible');
     });
-    // Cacher le bouton si déjà installé
     window.addEventListener('appinstalled', () => {
       btnInstall.classList.remove('visible');
       deferredPrompt = null;
@@ -887,34 +883,9 @@ if (!isInStandaloneMode) {
   }
 }
 
-// ── Init : préchargement immédiat dès le chargement de la page ───────────────
-prechargerTout();
-// ── Notifications push ────────────────────────────────────────────────────────
+// ── Notifications ─────────────────────────────────────────────────────────────
 const btnNotif = document.getElementById('btn-notif');
 let vapidPublicKey = null;
-let notifInitialise = false;
-
-// Attacher le listener UNE SEULE FOIS dès le départ
-btnNotif.addEventListener('click', toggleNotifications);
-
-async function initNotifications() {
-  // Support push disponible ?
-  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-    btnNotif.style.display = 'none';
-    return;
-  }
-  // Charger la clé VAPID (ne masquer le bouton qu'en cas d'erreur définitive)
-  try {
-    const r = await fetch('/api/push/vapid-public-key');
-    if (r.ok) {
-      vapidPublicKey = (await r.json()).publicKey;
-    }
-    // Si erreur réseau, on laisse le bouton visible — l'erreur sera gérée au clic
-  } catch { /* laisser le bouton visible */ }
-
-  await majEtatBoutonNotif();
-  notifInitialise = true;
-}
 
 async function majEtatBoutonNotif() {
   try {
@@ -934,34 +905,24 @@ async function majEtatBoutonNotif() {
 }
 
 async function toggleNotifications() {
-  // Vérifier le support
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     afficherMsg('erreur', 'Votre navigateur ne supporte pas les notifications push.', 'msg-inserer');
-    naviguerVers('inserer');
-    return;
+    naviguerVers('inserer'); return;
   }
-
-  // Charger la clé si pas encore fait
   if (!vapidPublicKey) {
     try {
       const r = await fetch('/api/push/vapid-public-key');
-      if (!r.ok) throw new Error('Clé VAPID indisponible (statut ' + r.status + ')');
+      if (!r.ok) throw new Error('Statut ' + r.status);
       vapidPublicKey = (await r.json()).publicKey;
     } catch(e) {
-      afficherMsg('erreur', 'Impossible de charger la configuration : ' + e.message, 'msg-inserer');
-      naviguerVers('inserer');
-      return;
+      afficherMsg('erreur', 'Configuration VAPID inaccessible : ' + e.message, 'msg-inserer');
+      naviguerVers('inserer'); return;
     }
   }
-
   const perm = Notification.permission;
   let actif = false;
-  try {
-    const sr = await fetch('/api/push/status');
-    if (sr.ok) actif = (await sr.json()).actif;
-  } catch { /* actif reste false */ }
+  try { const sr = await fetch('/api/push/status'); if (sr.ok) actif = (await sr.json()).actif; } catch {}
 
-  // ── Désactiver ──
   if (perm === 'granted' && actif) {
     try {
       const reg = await navigator.serviceWorker.ready;
@@ -970,24 +931,17 @@ async function toggleNotifications() {
       await fetch('/api/push/subscribe', { method: 'DELETE' });
       await majEtatBoutonNotif();
       afficherMsg('info', 'Notifications désactivées.', 'msg-inserer');
-    } catch(e) {
-      afficherMsg('erreur', 'Erreur désactivation : ' + e.message, 'msg-inserer');
-    }
-    naviguerVers('inserer');
-    return;
+    } catch(e) { afficherMsg('erreur', 'Erreur : ' + e.message, 'msg-inserer'); }
+    naviguerVers('inserer'); return;
   }
-
-  // ── Activer ──
   if (perm === 'denied') {
-    alert('Les notifications sont bloquées. Autorisez-les dans Chrome → Paramètres du site → Notifications.');
+    alert('Notifications bloquées. Autorisez-les dans Chrome → Paramètres du site → Notifications.');
     return;
   }
   try {
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      afficherMsg('info', 'Permission de notification refusée.', 'msg-inserer');
-      naviguerVers('inserer');
-      return;
+    if (await Notification.requestPermission() !== 'granted') {
+      afficherMsg('info', 'Permission refusée.', 'msg-inserer');
+      naviguerVers('inserer'); return;
     }
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.subscribe({
@@ -995,43 +949,43 @@ async function toggleNotifications() {
       applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
     });
     await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(sub.toJSON()),
     });
     await majEtatBoutonNotif();
     const testR = await fetch('/api/push/test', { method: 'POST' });
     if (testR.ok) {
-      afficherMsg('succes', '✓ Notifications activées. Une notification de test vient d'être envoyée.', 'msg-inserer');
+      afficherMsg('succes', '✓ Notifications activées — une notification de test vient d'être envoyée.', 'msg-inserer');
     } else {
       const err = await testR.json().catch(() => ({}));
-      afficherMsg('info', 'Abonnement enregistré mais envoi échoué : ' + (err.detail || 'vérifiez les clés VAPID sur Railway.'), 'msg-inserer');
+      afficherMsg('info', 'Abonnement enregistré. Erreur test : ' + (err.detail || 'vérifiez VAPID sur Railway.'), 'msg-inserer');
     }
-  } catch(e) {
-    afficherMsg('erreur', 'Erreur activation : ' + e.message, 'msg-inserer');
-  }
+  } catch(e) { afficherMsg('erreur', 'Erreur : ' + e.message, 'msg-inserer'); }
   naviguerVers('inserer');
 }
 
-function urlBase64ToUint8Array(base64String) {
-  const pad = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + pad).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
+function urlBase64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
-// Init : attendre que le SW soit prêt, puis initialiser
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js')
-    .then(reg => reg.update())
-    .catch(() => {});
-  navigator.serviceWorker.ready
-    .then(() => initNotifications())
-    .catch(() => initNotifications());
-} else {
-  initNotifications();
+if (btnNotif) {
+  btnNotif.addEventListener('click', toggleNotifications);
+  // Init état bouton après que le SW soit prêt
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    navigator.serviceWorker.ready.then(async () => {
+      try {
+        const r = await fetch('/api/push/vapid-public-key');
+        if (r.ok) vapidPublicKey = (await r.json()).publicKey;
+      } catch {}
+      await majEtatBoutonNotif();
+    }).catch(() => {});
+  }
 }
+
+// ── Init calendrier ───────────────────────────────────────────────────────────
+prechargerTout();
 
 </script>
 </body>
-</html>
