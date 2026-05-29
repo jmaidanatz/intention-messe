@@ -531,10 +531,10 @@ async def api_corriger_violations():
             duree_int = (intention["date_end"] - intention["date_start"]).days + 1 \
                         if intention["date_end"] else 1
 
-            # Chercher la date libre la plus proche (alternance avant/après)
-            intentions_fresh2 = await fetch_all_intentions(forcer=True)
-            map_fresh = build_map_jour(intentions_fresh2)
-            nouvelle_date = _trouver_plus_proche(jour_viol, map_fresh, duree_int, today)
+            # Chercher la date libre la plus proche sur le map_jour LOCAL
+            # (mis à jour après chaque déplacement sans re-requêter Notion,
+            #  ce qui évite les problèmes de latence d'indexation)
+            nouvelle_date = _trouver_plus_proche(jour_viol, map_jour, duree_int, today)
 
             if nouvelle_date is None:
                 erreurs.append({
@@ -552,6 +552,26 @@ async def api_corriger_violations():
                 "nouvelle_date": nouvelle_date.isoformat(),
                 "ecart_jours":   abs((nouvelle_date - jour_viol).days),
             })
+
+            # Mettre à jour le map_jour LOCAL pour que le prochain déplacement
+            # tienne compte de celui qui vient d'être effectué
+            # 1. Retirer l'intention de son ancienne date
+            ancienne = intention["date_start"]
+            ancienne_end = intention["date_end"] or ancienne
+            cur = ancienne
+            while cur <= ancienne_end:
+                if cur in map_jour and intention in map_jour[cur]:
+                    map_jour[cur].remove(intention)
+                cur += timedelta(days=1)
+            # 2. L'ajouter à sa nouvelle date (avec date_end mis à jour)
+            intention_deplacee = dict(intention)
+            intention_deplacee["date_start"] = nouvelle_date
+            intention_deplacee["date_end"]   = new_end
+            cur = nouvelle_date
+            fin = new_end or nouvelle_date
+            while cur <= fin:
+                map_jour.setdefault(cur, []).append(intention_deplacee)
+                cur += timedelta(days=1)
 
     return {
         "ok":          len(erreurs) == 0,
