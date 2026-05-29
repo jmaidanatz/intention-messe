@@ -256,6 +256,9 @@ def _trouver_plus_proche(jour: date, map_jour: dict, duree: int, today: date,
     Cherche la date libre la plus proche de `jour` en alternant avant et après :
     J-1, J+1, J-2, J+2, ...  jusqu'à max_ecart jours d'écart.
     Ne propose pas de date dans le passé (< today).
+    Une date est valide si :
+      - le total d'intentions < capacité (place disponible), ET
+      - le nombre de ♦/inamovibles < capacité (on pourrait y placer sans ♦)
     """
     for ecart in range(1, max_ecart + 1):
         for signe in (-1, 1):
@@ -263,20 +266,20 @@ def _trouver_plus_proche(jour: date, map_jour: dict, duree: int, today: date,
             if candidate < today:
                 continue
             if duree == 1:
-                # Valide si la capacité n'est pas saturée par des ♦/inamovibles
-                cap = capacite(candidate)
-                bloques = [o for o in map_jour.get(candidate, [])
-                           if o["fixe"] or est_inamovible(o, today)]
-                if len(bloques) < cap:
+                cap    = capacite(candidate)
+                occs_c = map_jour.get(candidate, [])
+                bloques = [o for o in occs_c if o["fixe"] or est_inamovible(o, today)]
+                # Place disponible ET pas saturé en ♦/inamovibles
+                if len(occs_c) < cap and len(bloques) < cap:
                     return candidate
             else:
                 ok = True
                 for offset in range(duree):
-                    j = candidate + timedelta(days=offset)
-                    cap_j = capacite(j)
-                    bloques_j = [o for o in map_jour.get(j, [])
-                                 if o["fixe"] or est_inamovible(o, today)]
-                    if len(bloques_j) >= cap_j:
+                    j      = candidate + timedelta(days=offset)
+                    cap_j  = capacite(j)
+                    occs_j = map_jour.get(j, [])
+                    bloques_j = [o for o in occs_j if o["fixe"] or est_inamovible(o, today)]
+                    if len(occs_j) >= cap_j or len(bloques_j) >= cap_j:
                         ok = False
                         break
                 if ok:
