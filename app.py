@@ -252,9 +252,14 @@ async def manifest():
 async def diagnostic():
     token_ok = bool(NOTION_TOKEN)
     result: dict = {
-        "token_present": token_ok,
-        "token_prefix":  NOTION_TOKEN[:12] + "..." if token_ok else None,
-        "database_id":   NOTION_DS_ID,
+        "token_present":         token_ok,
+        "token_prefix":          NOTION_TOKEN[:12] + "..." if token_ok else None,
+        "database_id":           NOTION_DS_ID,
+        "vapid_public_present":  bool(VAPID_PUBLIC_KEY),
+        "vapid_public_prefix":   VAPID_PUBLIC_KEY[:12] + "..." if VAPID_PUBLIC_KEY else None,
+        "vapid_private_present": bool(VAPID_PRIVATE_KEY),
+        "vapid_email":           VAPID_EMAIL,
+        "env_vars_vapid":        {k: v[:8]+"..." for k, v in os.environ.items() if "VAPID" in k},
     }
     if not token_ok:
         result["erreur"] = "NOTION_TOKEN absent"
