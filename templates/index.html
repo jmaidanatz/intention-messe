@@ -387,6 +387,33 @@
   .spinner.cache { display: none; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ── Boutons durée ── */
+  .duree-btns {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+  }
+  .btn-duree {
+    font-family: 'DM Sans', sans-serif;
+    font-size: .78rem;
+    font-weight: 500;
+    letter-spacing: .05em;
+    padding: .5rem 1.2rem;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--bordure);
+    background: transparent;
+    color: var(--texte2);
+    cursor: pointer;
+    transition: var(--trans);
+  }
+  .btn-duree:hover { border-color: var(--teal); color: var(--teal); }
+  .btn-duree.actif {
+    background: var(--teal);
+    border-color: var(--teal);
+    color: #fff;
+    font-weight: 600;
+  }
+
   @media (prefers-color-scheme: dark) {
     :root {
       --fond:    #111a1e;
@@ -458,9 +485,13 @@
             <label>Date souhaitée</label>
             <input type="date" id="date_souhaitee">
           </div>
-          <div class="champ">
-            <label>Date de fin</label>
-            <input type="date" id="date_fin">
+          <div class="champ" style="grid-column:1/-1">
+            <label>Durée</label>
+            <div class="duree-btns" id="duree-btns">
+              <button type="button" class="btn-duree actif" data-duree="1">Un jour</button>
+              <button type="button" class="btn-duree" data-duree="9">Neuvaine</button>
+              <button type="button" class="btn-duree" data-duree="30">Trentain</button>
+            </div>
           </div>
           <div class="champ" style="grid-column:1/-1">
             <label>Note</label>
@@ -522,6 +553,7 @@
     <div class="titre-section">Violations de capacité</div>
     <div class="btn-row" style="margin-bottom:1.2rem">
       <button class="btn btn-teal" id="btn-violations">Analyser</button>
+      <button class="btn btn-ghost" id="btn-corriger" style="display:none">Corriger</button>
       <span class="spinner cache" id="spin-viol"></span>
     </div>
     <div id="liste-violations"></div>
@@ -805,7 +837,7 @@ async function soumettreForme(force = false) {
     demandeur:      document.getElementById('demandeur').value.trim() || null,
     description:    document.getElementById('description').value.trim() || null,
     date_souhaitee: document.getElementById('date_souhaitee').value || null,
-    date_fin:       document.getElementById('date_fin').value || null,
+    date_fin:       calculerDateFin(document.getElementById('date_souhaitee').value || null, parseInt(document.querySelector('.btn-duree.actif').dataset.duree)),
     force_date:     force,
   };
   try {
@@ -836,6 +868,8 @@ async function soumettreForme(force = false) {
       afficherMsg('info', html, 'msg-inserer');
     } else { afficherMsg('succes', html, 'msg-inserer'); }
     document.getElementById('form-insertion').reset();
+    document.querySelectorAll('.btn-duree').forEach(b => b.classList.remove('actif'));
+    document.querySelector('.btn-duree[data-duree="1"]').classList.add('actif');
     // Une insertion peut déplacer des intentions sur plusieurs mois → invalider tout
     cache = {}; cacheGenere = 0; sauverCache();
   } catch(e) { afficherMsg('erreur', 'Erreur réseau : ' + e.message, 'msg-inserer'); }
@@ -872,21 +906,58 @@ document.getElementById('btn-dl').addEventListener('click', async () => {
 
 // ── Violations ───────────────────────────────────────────────────────────────
 document.getElementById('btn-violations').addEventListener('click', async () => {
-  const spin = document.getElementById('spin-viol');
-  const liste = document.getElementById('liste-violations');
-  spin.classList.remove('cache'); liste.innerHTML = '';
+  const spin    = document.getElementById('spin-viol');
+  const liste   = document.getElementById('liste-violations');
+  const btnCorr = document.getElementById('btn-corriger');
+  spin.classList.remove('cache'); liste.innerHTML = ''; btnCorr.style.display = 'none';
   try {
     const r = await fetch('/api/violations');
     const data = await r.json();
-    if (!data.length) { liste.innerHTML = '<div class="message info visible">Aucune violation détectée.</div>'; }
-    else {
+    if (!data.length) {
+      liste.innerHTML = '<div class="message info visible">Aucune violation détectée.</div>';
+    } else {
       data.forEach(v => {
         const div = document.createElement('div'); div.className = 'violation-item';
-        let html = `<div class="violation-date">${fmtDate(v.date)} — ${v.count}/${v.capacite}</div><ul style="list-style:none">`;
-        v.intentions.forEach(i => { html += `<li style="font-size:.86rem;color:var(--texte2);padding:.2rem 0">· ${i.nom}${i.demandeur?' ('+i.demandeur+')':''}</li>`; });
-        html += '</ul>'; div.innerHTML = html; liste.appendChild(div);
+        let h = `<div class="violation-date">${fmtDate(v.date)} — ${v.count}/${v.capacite}</div><ul style="list-style:none">`;
+        v.intentions.forEach(i => { h += `<li style="font-size:.86rem;color:var(--texte2);padding:.2rem 0">· ${i.nom}${i.demandeur?' ('+i.demandeur+')':''}</li>`; });
+        h += '</ul>'; div.innerHTML = h; liste.appendChild(div);
       });
+      btnCorr.style.display = '';   // afficher le bouton Corriger
     }
+  } catch(e) { liste.innerHTML = `<div class="message erreur visible">Erreur : ${e.message}</div>`; }
+  finally { spin.classList.add('cache'); }
+});
+
+document.getElementById('btn-corriger').addEventListener('click', async () => {
+  const spin    = document.getElementById('spin-viol');
+  const liste   = document.getElementById('liste-violations');
+  const btnCorr = document.getElementById('btn-corriger');
+  spin.classList.remove('cache'); liste.innerHTML = '';
+  try {
+    const r = await fetch('/api/violations/corriger', { method: 'POST' });
+    const data = await r.json();
+    let html = '';
+    if (data.deplacements.length) {
+      html += '<div class="message succes visible">';
+      html += `<strong>${data.deplacements.length} déplacement${data.deplacements.length > 1 ? 's' : ''} effectué${data.deplacements.length > 1 ? 's' : ''}</strong><br>`;
+      data.deplacements.forEach(d => {
+        const ecart = d.ecart_jours === 1 ? '1 jour' : `${d.ecart_jours} jours`;
+        html += `· <em>${d.nom}</em> : ${fmtDate(d.ancienne_date)} → ${fmtDate(d.nouvelle_date)} <span style="color:var(--texte3);font-size:.82rem">(+${ecart})</span><br>`;
+      });
+      html += '</div>';
+    }
+    if (data.erreurs.length) {
+      html += '<div class="message erreur visible" style="margin-top:.5rem">';
+      data.erreurs.forEach(e => { html += `· ${fmtDate(e.date)} : ${e.message}<br>`; });
+      html += '</div>';
+    }
+    if (!data.deplacements.length && !data.erreurs.length) {
+      html = '<div class="message info visible">Aucune violation à corriger.</div>';
+    }
+    liste.innerHTML = html;
+    btnCorr.style.display = 'none';
+    // Invalider le cache calendrier
+    cache = {}; cacheGenere = 0; sauverCache();
   } catch(e) { liste.innerHTML = `<div class="message erreur visible">Erreur : ${e.message}</div>`; }
   finally { spin.classList.add('cache'); }
 });
@@ -977,6 +1048,22 @@ function getDeviceName() {
 }
 const DEVICE_ID   = getDeviceId();
 const DEVICE_NAME = getDeviceName();
+
+// ── Boutons durée ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.btn-duree').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.btn-duree').forEach(b => b.classList.remove('actif'));
+    btn.classList.add('actif');
+  });
+});
+
+function calculerDateFin(dateDebut, duree) {
+  if (duree <= 1) return null;
+  if (!dateDebut) return null;
+  const d = new Date(dateDebut + 'T00:00:00');
+  d.setDate(d.getDate() + duree - 1);
+  return d.toISOString().split('T')[0];
+}
 
 async function majEtatBoutonNotif() {
   try {

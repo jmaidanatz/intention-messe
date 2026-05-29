@@ -250,6 +250,40 @@ def trouver_date_libre(depuis: date, map_jour: dict, duree: int = 1) -> Optional
     return None
 
 
+def _trouver_plus_proche(jour: date, map_jour: dict, duree: int, today: date,
+                          max_ecart: int = 60) -> Optional[date]:
+    """
+    Cherche la date libre la plus proche de `jour` en alternant avant et après :
+    J-1, J+1, J-2, J+2, ...  jusqu'à max_ecart jours d'écart.
+    Ne propose pas de date dans le passé (< today).
+    """
+    for ecart in range(1, max_ecart + 1):
+        for signe in (-1, 1):
+            candidate = jour + timedelta(days=signe * ecart)
+            if candidate < today:
+                continue
+            if duree == 1:
+                if est_libre(candidate, map_jour):
+                    return candidate
+            else:
+                # Vérifier que tout le bloc est libre et sans inamovibles/♦
+                ok = True
+                for offset in range(duree):
+                    j = candidate + timedelta(days=offset)
+                    for occ in map_jour.get(j, []):
+                        if occ["fixe"] or est_inamovible(occ, today):
+                            ok = False
+                            break
+                    if not ok:
+                        break
+                if ok:
+                    # Vérifier aussi la capacité pour chaque jour du bloc
+                    if all(est_libre(candidate + timedelta(days=o), map_jour)
+                           for o in range(duree)):
+                        return candidate
+    return None
+
+
 def detect_violations(intentions: list[dict]) -> list[dict]:
     map_jour = build_map_jour(intentions)
     aujourd = date.today()
@@ -445,6 +479,85 @@ async def api_date_libre(req: DateLibreRequest):
 @app.get("/api/violations")
 async def api_violations():
     return detect_violations(await fetch_all_intentions())
+
+
+@app.post("/api/violations/corriger")
+async def api_corriger_violations():
+    """
+    Pour chaque violation future :
+    - identifie les intentions déplaçables (sans ♦, non inamovibles)
+    - les déplace vers la date libre la plus proche de leur date actuelle
+      (cherche d'abord J-1, J+1, J-2, J+2… pour minimiser le décalage)
+    """
+    today = date.today()
+    intentions = await fetch_all_intentions()
+    violations = detect_violations(intentions)   # déjà filtrées ≥ aujourd'hui
+
+    if not violations:
+        return {"ok": True, "deplacements": [], "message": "Aucune violation à corriger."}
+
+    deplacements = []
+    erreurs = []
+
+    for viol in violations:
+        jour_viol = date.fromisoformat(viol["date"])
+        # Recharger après chaque déplacement pour avoir le map_jour à jour
+        intentions_fresh = await fetch_all_intentions(forcer=True)
+        map_jour = build_map_jour(intentions_fresh)
+        occs = map_jour.get(jour_viol, [])
+        cap  = capacite(jour_viol)
+        if len(occs) <= cap:
+            continue   # déjà résolu par un déplacement précédent
+
+        # Identifier les déplaçables : sans ♦, non inamovibles
+        deplacables = sorted(
+            [o for o in occs if not o["fixe"] and not est_inamovible(o, today)],
+            key=lambda o: (o["date_start"], o["id"]),
+            reverse=True   # déplacer les plus récents en premier
+        )
+
+        # Combien faut-il en déplacer ?
+        nb_a_deplacer = len(occs) - cap
+        a_deplacer = deplacables[:nb_a_deplacer]
+
+        if not a_deplacer:
+            erreurs.append({
+                "date": viol["date"],
+                "message": "Toutes les intentions sont fixes ou inamovibles."
+            })
+            continue
+
+        for intention in a_deplacer:
+            duree_int = (intention["date_end"] - intention["date_start"]).days + 1 \
+                        if intention["date_end"] else 1
+
+            # Chercher la date libre la plus proche (alternance avant/après)
+            intentions_fresh2 = await fetch_all_intentions(forcer=True)
+            map_fresh = build_map_jour(intentions_fresh2)
+            nouvelle_date = _trouver_plus_proche(jour_viol, map_fresh, duree_int, today)
+
+            if nouvelle_date is None:
+                erreurs.append({
+                    "date": viol["date"],
+                    "message": f"Impossible de replacer « {intention['nom']} » — aucune date libre trouvée."
+                })
+                continue
+
+            new_end = (nouvelle_date + timedelta(days=duree_int - 1)) if duree_int > 1 else None
+            await notion_update_date(intention["id"], nouvelle_date, new_end)
+            deplacements.append({
+                "nom":           intention["nom"],
+                "demandeur":     intention["demandeur"],
+                "ancienne_date": intention["date_start"].isoformat(),
+                "nouvelle_date": nouvelle_date.isoformat(),
+                "ecart_jours":   abs((nouvelle_date - jour_viol).days),
+            })
+
+    return {
+        "ok":          len(erreurs) == 0,
+        "deplacements": deplacements,
+        "erreurs":      erreurs,
+    }
 
 
 @app.post("/api/inserer")
