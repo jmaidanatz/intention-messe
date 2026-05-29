@@ -688,8 +688,53 @@ class PushSubscription(BaseModel):
 async def get_vapid_public_key():
     """Retourne la clé publique VAPID pour le frontend."""
     if not VAPID_PUBLIC_KEY:
-        raise HTTPException(500, "VAPID_PUBLIC_KEY non configurée.")
+        raise HTTPException(503, "VAPID_PUBLIC_KEY absente. Allez sur /api/push/generer-vapid pour obtenir une paire de cles.")
     return {"publicKey": VAPID_PUBLIC_KEY}
+
+
+@app.get("/api/push/generer-vapid")
+async def generer_vapid():
+    """Genere une paire de cles VAPID pretes a copier dans Railway."""
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    from fastapi.responses import HTMLResponse
+    import base64
+
+    key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+    pub = key.public_key()
+
+    def b64url(data):
+        return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+    pub_bytes  = pub.public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    priv_bytes = key.private_numbers().private_value.to_bytes(32, "big")
+    public_key  = b64url(pub_bytes)
+    private_key = b64url(priv_bytes)
+
+    html = """<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Cles VAPID</title>
+<style>
+  body{font-family:monospace;max-width:700px;margin:3rem auto;padding:1rem;background:#faf8f4;color:#1a1410}
+  h1{font-family:serif;font-size:1.4rem;margin-bottom:1.5rem}
+  .card{background:#fff;border:1px solid #ddd5c8;border-radius:4px;padding:1.2rem 1.4rem;margin-bottom:1rem}
+  .label{font-size:.75rem;font-weight:600;color:#6b5f52;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem}
+  .key{word-break:break-all;font-size:.82rem;background:#f2ede4;padding:.6rem .8rem;border-radius:3px;cursor:pointer;border:1px solid #ddd5c8}
+  .key:hover{background:#e8e0d0}
+  .note{font-size:.82rem;color:#a39787;margin-top:1.5rem;line-height:1.6}
+  .warn{color:#9b2335;font-weight:600}
+</style></head><body>
+<h1>Cles VAPID generees</h1>
+<p style="font-size:.85rem;color:#6b5f52;margin-bottom:1.5rem">Cliquez sur chaque cle pour la copier, puis collez-la dans Railway Variables.</p>
+<div class="card"><div class="label">VAPID_PUBLIC_KEY</div>
+<div class="key" onclick="navigator.clipboard.writeText(this.innerText);this.style.background='#d4edda'">""" + public_key + """</div></div>
+<div class="card"><div class="label">VAPID_PRIVATE_KEY</div>
+<div class="key" onclick="navigator.clipboard.writeText(this.innerText);this.style.background='#d4edda'">""" + private_key + """</div></div>
+<div class="note"><span class="warn">Ces cles ne sont valables que pour cette generation.</span><br>
+Rechargez la page pour en generer de nouvelles (les anciennes ne fonctionneront plus).<br><br>
+Apres avoir ajoute les variables dans Railway, cliquez sur Redeploy.
+</div></body></html>"""
+    return HTMLResponse(html)
 
 
 @app.post("/api/push/subscribe")
