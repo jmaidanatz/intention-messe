@@ -280,7 +280,8 @@ def serialise_jour(cur: date, map_jour: dict) -> dict:
             "nom":      o["nom"],
             "demandeur": o["demandeur"],
             "fixe":     o["fixe"],
-            "periode":  o["date_end"] is not None,
+            "periode":       o["date_end"] is not None,
+            "duree_periode": (o["date_end"] - o["date_start"]).days + 1 if o["date_end"] else None,
         } for o in occs],
     }
 
@@ -303,6 +304,8 @@ class DateLibreRequest(BaseModel):
 class PushSubscription(BaseModel):
     endpoint:       str
     keys:           dict
+    device_id:      str = "default"
+    device_name:    Optional[str] = None   # ex. "Android Chrome", "Windows Chrome"
     expirationTime: Optional[float] = None
 
 
@@ -615,35 +618,57 @@ from pywebpush import webpush, WebPushException
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import pytz
 
-DATA_DIR = Path("data")
-SUB_FILE = DATA_DIR / "subscription.json"
+DATA_DIR  = Path("data")
+SUBS_DIR  = DATA_DIR / "subscriptions"
 DATA_DIR.mkdir(exist_ok=True)
-PARIS = pytz.timezone("Europe/Paris")
+SUBS_DIR.mkdir(exist_ok=True)
+PARIS     = pytz.timezone("Europe/Paris")
 MOIS_ABBR = ['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']
 
 
-def lire_subscription() -> Optional[dict]:
-    if SUB_FILE.exists():
+def _sub_path(device_id: str) -> Path:
+    # Sanitize : garder uniquement alphanum + tirets
+    safe = "".join(c for c in device_id if c.isalnum() or c == "-")[:64]
+    return SUBS_DIR / f"{safe}.json"
+
+
+def lire_subscriptions() -> list[dict]:
+    """Retourne toutes les subscriptions actives."""
+    subs = []
+    for p in SUBS_DIR.glob("*.json"):
         try:
-            return json.loads(SUB_FILE.read_text())
+            subs.append(json.loads(p.read_text()))
         except Exception:
-            return None
-    return None
+            pass
+    return subs
 
 
-def sauver_subscription(sub: dict) -> None:
-    SUB_FILE.write_text(json.dumps(sub, ensure_ascii=False, indent=2))
+def sauver_subscription(device_id: str, sub: dict) -> None:
+    _sub_path(device_id).write_text(json.dumps(sub, ensure_ascii=False, indent=2))
 
 
-def supprimer_subscription() -> None:
-    if SUB_FILE.exists():
-        SUB_FILE.unlink()
+def supprimer_subscription(device_id: str) -> None:
+    p = _sub_path(device_id)
+    if p.exists():
+        p.unlink()
 
 
-def envoyer_notification(subscription: dict, titre: str, corps: str) -> bool:
+def supprimer_subscription_par_endpoint(endpoint: str) -> None:
+    """Supprime l'abonnement dont l'endpoint correspond (utilisé en cas de 404/410)."""
+    for p in SUBS_DIR.glob("*.json"):
+        try:
+            data = json.loads(p.read_text())
+            if data.get("endpoint") == endpoint:
+                p.unlink()
+                return
+        except Exception:
+            pass
+
+
+def _envoyer_une(subscription: dict, titre: str, corps: str) -> tuple[bool, str]:
+    """Envoie à un seul abonné. Retourne (succès, msg_erreur)."""
     if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
-        logger.warning("VAPID absentes — pas d'envoi")
-        return False
+        return False, "VAPID absentes."
     try:
         webpush(
             subscription_info=subscription,
@@ -652,15 +677,38 @@ def envoyer_notification(subscription: dict, titre: str, corps: str) -> bool:
             vapid_private_key=VAPID_PRIVATE_KEY,
             vapid_claims={"sub": f"mailto:{VAPID_EMAIL}"},
         )
-        return True
+        return True, ""
     except WebPushException as e:
-        logger.error("Push error: %s", e)
-        if e.response and e.response.status_code in (404, 410):
-            supprimer_subscription()
-        return False
+        status = e.response.status_code if e.response else "?"
+        body  = e.response.text[:200] if e.response else ""
+        msg   = f"Push HTTP {status} : {body}"
+        if status in (404, 410):
+            supprimer_subscription_par_endpoint(subscription.get("endpoint", ""))
+            msg += " (abonnement expiré, supprimé)"
+        elif status == 403:
+            msg += " — Mismatch VAPID : désabonnez puis réabonnez cet appareil."
+        logger.error("Push: %s", msg)
+        return False, msg
     except Exception as e:
-        logger.error("Push unexpected: %s", e)
-        return False
+        msg = f"{type(e).__name__} : {str(e)[:200]}"
+        logger.error("Push unexpected: %s", msg)
+        return False, msg
+
+
+def envoyer_a_tous(titre: str, corps: str) -> dict:
+    """Envoie à tous les appareils abonnés. Retourne un résumé."""
+    subs = lire_subscriptions()
+    if not subs:
+        return {"envoyes": 0, "echecs": 0, "detail": []}
+    resultats = []
+    for sub in subs:
+        ok, err = _envoyer_une(sub, titre, corps)
+        resultats.append({"endpoint": sub.get("endpoint", "")[:40], "ok": ok, "err": err})
+    return {
+        "envoyes": sum(1 for r in resultats if r["ok"]),
+        "echecs":  sum(1 for r in resultats if not r["ok"]),
+        "detail":  resultats,
+    }
 
 
 def _texte_intentions_du_jour(occs: list[dict], jour: date) -> tuple[str, str]:
@@ -673,9 +721,6 @@ def _texte_intentions_du_jour(occs: list[dict], jour: date) -> tuple[str, str]:
 
 
 async def tache_notification_matin():
-    sub = lire_subscription()
-    if not sub:
-        return
     aujourd = date.today()
     try:
         intentions = await fetch_all_intentions(forcer=True)
@@ -684,7 +729,8 @@ async def tache_notification_matin():
         return
     occs = build_map_jour(intentions).get(aujourd, [])
     titre, corps = _texte_intentions_du_jour(occs, aujourd)
-    envoyer_notification(sub, titre, corps)
+    res = envoyer_a_tous(titre, corps)
+    logger.info("Notification matin: %d envoyées, %d échecs", res["envoyes"], res["echecs"])
 
 
 scheduler = AsyncIOScheduler(timezone=PARIS)
@@ -747,33 +793,58 @@ Apres ajout dans Railway, cliquez sur Redeploy.</div></body></html>"""
 
 @app.post("/api/push/subscribe")
 async def push_subscribe(sub: PushSubscription):
-    sauver_subscription({"endpoint": sub.endpoint, "keys": sub.keys, "expirationTime": sub.expirationTime})
+    sauver_subscription(sub.device_id, {
+        "endpoint":       sub.endpoint,
+        "keys":           sub.keys,
+        "device_id":      sub.device_id,
+        "device_name":    sub.device_name or "Appareil inconnu",
+        "expirationTime": sub.expirationTime,
+    })
     return {"ok": True}
 
 
 @app.delete("/api/push/subscribe")
-async def push_unsubscribe():
-    supprimer_subscription()
+async def push_unsubscribe(device_id: str = "default"):
+    supprimer_subscription(device_id)
     return {"ok": True}
 
 
 @app.get("/api/push/status")
-async def push_status():
-    sub = lire_subscription()
-    return {"actif": sub is not None}
+async def push_status(device_id: str = "default"):
+    p = _sub_path(device_id)
+    subs = lire_subscriptions()
+    noms = [s.get("device_name", s.get("device_id", "?")) for s in subs]
+    return {
+        "actif":        p.exists(),
+        "total_appareils": len(subs),
+        "appareils":    noms,
+    }
 
 
 @app.post("/api/push/test")
-async def push_test():
-    sub = lire_subscription()
-    if not sub:
-        raise HTTPException(400, "Aucun abonnement enregistré.")
+async def push_test(device_id: str = "default"):
+    """Envoie une notification de test à un appareil spécifique (ou tous si device_id=all)."""
     aujourd = date.today()
     try:
         occs = build_map_jour(await fetch_all_intentions()).get(aujourd, [])
     except Exception:
         occs = []
     titre, corps = _texte_intentions_du_jour(occs, aujourd)
-    if not envoyer_notification(sub, titre, corps):
-        raise HTTPException(500, "Échec de l'envoi. Vérifiez les clés VAPID.")
+
+    if device_id == "all":
+        res = envoyer_a_tous(titre, corps)
+        if res["envoyes"] == 0:
+            raise HTTPException(500, f"Tous les envois ont échoué : {res['detail']}")
+        return {"ok": True, "envoyes": res["envoyes"], "echecs": res["echecs"]}
+
+    p = _sub_path(device_id)
+    if not p.exists():
+        raise HTTPException(400, f"Aucun abonnement pour device_id={device_id}.")
+    try:
+        sub = json.loads(p.read_text())
+    except Exception:
+        raise HTTPException(500, "Fichier d'abonnement illisible.")
+    ok, err = _envoyer_une(sub, titre, corps)
+    if not ok:
+        raise HTTPException(500, err)
     return {"ok": True}
