@@ -199,7 +199,14 @@ def capacite(jour: date) -> int:
     """Capacité d'un jour. Mise en cache (jour → capacité ne change jamais)."""
     if jour.month in (7, 8):               return 1   # juillet-août
     if (jour.month, jour.day) == (12, 25): return 3   # Noël
-    if (jour.month, jour.day) == (11, 2):  return 3   # Commémoration des défunts
+    if (jour.month, jour.day) == (11, 2):
+        # Si le 2 nov tombe un dimanche, la Commémoration est reportée au 3
+        if jour.weekday() == 6:            return 2   # dimanche ordinaire
+        return 3                                       # Commémoration des défunts
+    if (jour.month, jour.day) == (11, 3):
+        # Si le 2 nov tombait un dimanche, le 3 hérite de la capacité 3
+        veille = date(jour.year, 11, 2)
+        if veille.weekday() == 6:          return 3   # Commémoration reportée
     if (jour.month, jour.day) == (11, 1):  return 2   # Toussaint
     if jour == ascension(jour.year):       return 2   # Ascension
     if jour.weekday() == 6:                return 2   # Dimanche
