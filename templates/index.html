@@ -53,13 +53,17 @@
     .message.succes { background: #0d2e1a; border-color: #2a6040; color: #7ecfa0; }
     .message.erreur { background: #2e0d10; border-color: #6b2030; color: #e08090; }
     .message.info   { background: #2a2010; border-color: #6b5020; color: #d4a84b; }
-    .violation-item { background: #2e1015; border-color: #6b2030; }
+    .violation-item { background: #2e1015; border-color: #6b2030; color: var(--texte2); }
+    .violation-date { color: #e08090; }
     .result-libre   { background: var(--blanc); }
     .jour-cal.aujourd-hui { background: #1a2d36; }
     .jour-cal.violation   { background: #2e1015; border-color: #6b2030; }
     .badge-fixe    { background: #2a2010; border-color: #6b5020; }
     .badge-periode { background: #0d2e1a; border-color: #2a6040; }
     .planning-jour:active { background: #1a262c; }
+    /* Alertes dans le popup et les résultats */
+    .popup { background: var(--blanc); }
+    .liste-intentions li { border-bottom-color: var(--fond2); }
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -817,7 +821,7 @@ async function soumettreForme(force = false) {
       data.deplacements.forEach(d => { html += `<br>· <em>${d.nom}</em> : ${fmtDate(d.ancienne_date)} → ${fmtDate(d.nouvelle_date)}`; });
     }
     if (data.alertes && data.alertes.length) {
-      html += '<br><br><span style="font-weight:600;color:#9b2335">⚠ Violations résiduelles :</span>';
+      html += '<br><br><span style="font-weight:600;color:var(--rouge)">⚠ Violations résiduelles :</span>';
       data.alertes.forEach(a => {
         html += `<br>· ${fmtDate(a.date)} : ${a.count}/${a.capacite}`;
         a.intentions.forEach(i => { html += `<br>&nbsp;&nbsp;— ${i.nom}${i.demandeur?' ('+i.demandeur+')':''}`; });

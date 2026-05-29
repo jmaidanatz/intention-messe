@@ -252,8 +252,11 @@ def trouver_date_libre(depuis: date, map_jour: dict, duree: int = 1) -> Optional
 
 def detect_violations(intentions: list[dict]) -> list[dict]:
     map_jour = build_map_jour(intentions)
+    aujourd = date.today()
     viol = []
     for jour, occs in map_jour.items():
+        if jour < aujourd:
+            continue
         if len(occs) > capacite(jour):
             viol.append({
                 "date":       jour.isoformat(),
