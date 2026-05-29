@@ -955,7 +955,7 @@ async function toggleNotifications() {
     await majEtatBoutonNotif();
     const testR = await fetch('/api/push/test', { method: 'POST' });
     if (testR.ok) {
-      afficherMsg('succes', '✓ Notifications activées — une notification de test vient d'être envoyée.', 'msg-inserer');
+      afficherMsg('succes', '✓ Notifications activées — une notification de test vient d\'être envoyée.', 'msg-inserer');
     } else {
       const err = await testR.json().catch(() => ({}));
       afficherMsg('info', 'Abonnement enregistré. Erreur test : ' + (err.detail || 'vérifiez VAPID sur Railway.'), 'msg-inserer');
