@@ -667,8 +667,10 @@
 const MOIS_FR  = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const JOURS_3  = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
 
-const today = new Date(); today.setHours(0,0,0,0);
-const todayISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+// Date locale du navigateur — sans toISOString() qui convertit en UTC
+const _now = new Date();
+const todayISO = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
+const today = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate());
 
 const limiteMin = new Date(today.getFullYear(), today.getMonth() - 3, 1);
 const limiteMax = new Date(today.getFullYear(), today.getMonth() + 11, 1);
