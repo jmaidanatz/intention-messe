@@ -1,5 +1,5 @@
-// v4 — icônes servies en fichiers, icône notification monochrome
-const CACHE = 'intentions-v4';
+// v5 — force rechargement HTML, todayISO fix
+const CACHE = 'intentions-v5';
 const STATIC_ASSETS = [
   '/static/icon-192.png',
   '/static/icon-512.png',
