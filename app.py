@@ -335,6 +335,38 @@ def _trouver_plus_proche(jour: date, map_jour: dict, duree: int, today: date,
     return None
 
 
+def trouver_date_non_bloquee(depuis: date, map_jour: dict, today: date,
+                              duree: int = 1) -> Optional[date]:
+    """
+    Trouve le premier jour à partir de `depuis` où il y a une place non saturée
+    par des ♦/inamovibles — même si le jour est déjà occupé par des sans-♦.
+    C'est la logique "Dès que possible" : on peut déplacer les sans-♦ présents.
+    """
+    plafond = depuis + timedelta(days=MAX_SEARCH)
+    cur = depuis
+    while cur <= plafond:
+        if duree == 1:
+            cap     = capacite(cur)
+            bloques = [o for o in map_jour.get(cur, [])
+                       if o["fixe"] or est_inamovible(o, today)]
+            if len(bloques) < cap:
+                return cur
+        else:
+            ok = True
+            for offset in range(duree):
+                j       = cur + timedelta(days=offset)
+                cap_j   = capacite(j)
+                bloques_j = [o for o in map_jour.get(j, [])
+                             if o["fixe"] or est_inamovible(o, today)]
+                if len(bloques_j) >= cap_j:
+                    ok = False
+                    break
+            if ok:
+                return cur
+        cur += timedelta(days=1)
+    return None
+
+
 def detect_violations(intentions: list[dict]) -> list[dict]:
     map_jour = build_map_jour(intentions)
     aujourd = date.today()
@@ -373,12 +405,13 @@ def serialise_jour(cur: date, map_jour: dict) -> dict:
 
 # ── Modèles ─────────────────────────────────────────────────────────────────
 class InsertionRequest(BaseModel):
-    nom:            str
-    demandeur:      Optional[str] = None
-    description:    Optional[str] = None
-    date_souhaitee: Optional[str] = None
-    date_fin:       Optional[str] = None
-    force_date:     bool = False
+    nom:              str
+    demandeur:        Optional[str] = None
+    description:      Optional[str] = None
+    date_souhaitee:   Optional[str] = None
+    date_fin:         Optional[str] = None
+    des_que_possible: bool = False   # Se glisser sur le 1er jour non bloqué par ♦
+    force_date:       bool = False
 
 
 class DateLibreRequest(BaseModel):
@@ -742,14 +775,37 @@ async def api_inserer(request: Request, req: InsertionRequest):
     intentions = await fetch_all_intentions()
     map_jour   = build_map_jour(intentions)
 
-    # Date cible
+    # Date cible selon le mode choisi
+    dqp = req.des_que_possible  # alias court
+
     if req.date_souhaitee:
         try:
             cible = date.fromisoformat(req.date_souhaitee)
         except ValueError:
             raise HTTPException(400, "Format de date invalide (attendu YYYY-MM-DD).")
         date_precise = True
+        if dqp:
+            # Date souhaitée + "Dès que possible" :
+            # Si la date souhaitée est bloquée (♦/inamovible saturant), chercher
+            # le 1er jour non bloqué à partir de cette date.
+            cap_c   = capacite(cible)
+            bloques = [o for o in map_jour.get(cible, [])
+                       if o["fixe"] or est_inamovible(o, today)]
+            if len(bloques) >= cap_c:
+                nouvelle = trouver_date_non_bloquee(cible, map_jour, today)
+                if nouvelle is None:
+                    raise HTTPException(404, "Aucune date disponible dans les 365 prochains jours.")
+                cible = nouvelle
+                date_precise = True   # date calculée → on ajoute ♦
+    elif dqp:
+        # Pas de date souhaitée + "Dès que possible" :
+        # 1er jour à partir d'aujourd'hui non bloqué par ♦ (peut contenir des sans-♦)
+        cible = trouver_date_non_bloquee(today, map_jour, today)
+        if cible is None:
+            raise HTTPException(404, "Aucune date disponible dans les 365 prochains jours.")
+        date_precise = True
     else:
+        # Comportement classique : 1er jour totalement libre
         cible = trouver_date_libre(today, map_jour)
         if cible is None:
             raise HTTPException(404, "Aucune date libre dans les 365 prochains jours.")

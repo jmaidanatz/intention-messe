@@ -400,6 +400,30 @@
   .spinner.cache { display: none; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ── Toggle Dès que possible ── */
+  .toggle-dqp {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    cursor: pointer;
+    font-size: .82rem;
+    font-weight: 400;
+    color: var(--texte2);
+    text-transform: none;
+    letter-spacing: 0;
+    margin-top: .3rem;
+    user-select: none;
+  }
+  .toggle-dqp input[type="checkbox"] {
+    accent-color: var(--teal);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    margin: 0;
+    flex-shrink: 0;
+  }
+  .toggle-dqp:hover { color: var(--texte); }
+
   /* ── Boutons durée ── */
   .duree-btns {
     display: flex;
@@ -472,6 +496,8 @@
   <a href="/logout" id="btn-logout" title="Se déconnecter">⊘</a>
 </header>
 
+<div id="intention-jour" style="display:none;background:var(--teal);color:#fff;padding:.55rem 1.2rem;font-size:.85rem;font-family:'Cormorant Garamond',serif;font-style:italic;text-align:center;letter-spacing:.02em"></div>
+
 <nav>
   <button class="nav-btn actif" data-section="inserer" onclick="naviguerVers('inserer')">Insérer</button>
   <button class="nav-btn" data-section="calendrier" onclick="naviguerVers('calendrier')">Calendrier</button>
@@ -498,6 +524,10 @@
           <div class="champ">
             <label>Date souhaitée</label>
             <input type="date" id="date_souhaitee">
+            <label class="toggle-dqp" id="label-dqp">
+              <input type="checkbox" id="des_que_possible">
+              <span>Dès que possible</span>
+            </label>
           </div>
           <div class="champ" style="grid-column:1/-1">
             <label>Durée</label>
@@ -851,8 +881,9 @@ async function soumettreForme(force = false) {
     demandeur:      document.getElementById('demandeur').value.trim() || null,
     description:    document.getElementById('description').value.trim() || null,
     date_souhaitee: document.getElementById('date_souhaitee').value || null,
-    date_fin:       calculerDateFin(document.getElementById('date_souhaitee').value || null, parseInt(document.querySelector('.btn-duree.actif').dataset.duree)),
-    force_date:     force,
+    date_fin:           calculerDateFin(document.getElementById('date_souhaitee').value || null, parseInt(document.querySelector('.btn-duree.actif').dataset.duree)),
+    des_que_possible:   document.getElementById('des_que_possible').checked,
+    force_date:         force,
   };
   try {
     const r = await fetch('/api/inserer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
@@ -882,6 +913,7 @@ async function soumettreForme(force = false) {
       afficherMsg('info', html, 'msg-inserer');
     } else { afficherMsg('succes', html, 'msg-inserer'); }
     document.getElementById('form-insertion').reset();
+    document.getElementById('des_que_possible').checked = false;
     document.querySelectorAll('.btn-duree').forEach(b => b.classList.remove('actif'));
     document.querySelector('.btn-duree[data-duree="1"]').classList.add('actif');
     // Une insertion peut déplacer des intentions sur plusieurs mois → invalider tout
@@ -1184,6 +1216,25 @@ if (btnNotif) {
     }).catch(() => {});
   }
 }
+
+// ── Intention du jour ────────────────────────────────────────────────────────
+async function chargerIntentionJour() {
+  try {
+    const r = await fetch(`/api/calendrier?mois=${today.getMonth()+1}&annee=${today.getFullYear()}`);
+    if (!r.ok) return;
+    const data = await r.json();
+    const jourData = data.jours.find(j => j.date === todayISO);
+    const bandeau = document.getElementById('intention-jour');
+    if (!jourData || !jourData.intentions.length) {
+      bandeau.style.display = 'none';
+      return;
+    }
+    const texte = jourData.intentions.map(i => i.nom.replace(/^RIP - /, '✝\u00a0')).join('\u2003·\u2003');
+    bandeau.textContent = texte;
+    bandeau.style.display = 'block';
+  } catch { /* silencieux */ }
+}
+chargerIntentionJour();
 
 // ── Init calendrier ───────────────────────────────────────────────────────────
 prechargerTout();
