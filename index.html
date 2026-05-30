@@ -667,16 +667,20 @@
 const MOIS_FR  = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const JOURS_3  = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
 
-// Date locale du navigateur — sans toISOString() qui convertit en UTC
-const _now = new Date();
-const todayISO = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
-const today = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate());
+// Date locale recalculée à chaque appel — évite le bug si la page
+// reste ouverte d'un jour à l'autre (PWA).
+function getNow()     { return new Date(); }
+function getTodayISO() {
+  const d = getNow();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getToday()   { const d = getNow(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 
-const limiteMin = new Date(today.getFullYear(), today.getMonth() - 3, 1);
-const limiteMax = new Date(today.getFullYear(), today.getMonth() + 11, 1);
+const limiteMin = new Date(getNow().getFullYear(), getNow().getMonth() - 3, 1);
+const limiteMax = new Date(getNow().getFullYear(), getNow().getMonth() + 11, 1);
 
-let calMois  = today.getMonth() + 1;
-let calAnnee = today.getFullYear();
+let calMois  = getNow().getMonth() + 1;
+let calAnnee = getNow().getFullYear();
 
 // ── Onglets ──────────────────────────────────────────────────────────────────
 function naviguerVers(sectionId) {
@@ -794,7 +798,7 @@ function renderGrille(jours) {
   for (let i = 0; i < dec; i++) { const v = document.createElement('div'); v.className = 'jour-cal vide'; g.appendChild(v); }
   jours.forEach(j => {
     const el = document.createElement('div');
-    el.className = 'jour-cal' + (j.violation ? ' violation' : '') + (j.date === todayISO ? ' aujourd-hui' : '');
+    el.className = 'jour-cal' + (j.violation ? ' violation' : '') + (j.date === getTodayISO() ? ' aujourd-hui' : '');
     const num = document.createElement('span'); num.className = 'num-jour';
     num.textContent = new Date(j.date + 'T00:00:00').getDate(); el.appendChild(num);
     if (j.libre && !j.violation) { const d = document.createElement('span'); d.className = 'dot-libre'; el.appendChild(d); }
@@ -818,7 +822,7 @@ function renderPlanning(jours) {
   if (!jours || !jours.length) { p.innerHTML = '<div style="padding:1rem;color:var(--texte3)">Aucune donnée.</div>'; return; }
   jours.forEach(j => {
     const el = document.createElement('div');
-    el.className = 'planning-jour' + (j.date === todayISO ? ' aujourd-hui' : '') + (j.violation ? ' violation' : '');
+    el.className = 'planning-jour' + (j.date === getTodayISO() ? ' aujourd-hui' : '') + (j.violation ? ' violation' : '');
     const d = new Date(j.date + 'T00:00:00');
     const nomJour = JOURS_3[d.getDay()];
     const dotColor = j.violation ? 'var(--rouge)' : (j.libre ? 'var(--vert)' : 'var(--bordure)');
@@ -1024,7 +1028,7 @@ function afficherSucces(data) {
 }
 
 // ── Date libre ───────────────────────────────────────────────────────────────
-document.getElementById('dl-depuis').value = todayISO;
+document.getElementById('dl-depuis').value = getTodayISO();
 document.getElementById('btn-dl').addEventListener('click', async () => {
   const spin = document.getElementById('spin-dl');
   const result = document.getElementById('result-libre');
@@ -1321,10 +1325,10 @@ if (btnNotif) {
 // ── Intention du jour ────────────────────────────────────────────────────────
 async function chargerIntentionJour() {
   try {
-    const r = await fetch(`/api/calendrier?mois=${today.getMonth()+1}&annee=${today.getFullYear()}`);
+    const r = await fetch(`/api/calendrier?mois=${getNow().getMonth()+1}&annee=${getNow().getFullYear()}`);
     if (!r.ok) return;
     const data = await r.json();
-    const jourData = data.jours.find(j => j.date === todayISO);
+    const jourData = data.jours.find(j => j.date === getTodayISO());
     const bandeau = document.getElementById('intention-jour');
     if (!jourData || !jourData.intentions.length) {
       bandeau.style.display = 'none';
