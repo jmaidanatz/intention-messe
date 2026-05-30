@@ -1324,19 +1324,7 @@ async function chargerIntentionJour() {
     const r = await fetch(`/api/calendrier?mois=${today.getMonth()+1}&annee=${today.getFullYear()}`);
     if (!r.ok) return;
     const data = await r.json();
-    console.log('[bandeau] todayISO:', todayISO);
-    console.log('[bandeau] today.getDate():', today.getDate(), 'getMonth+1:', today.getMonth()+1);
     const jourData = data.jours.find(j => j.date === todayISO);
-    console.log('[bandeau] jourData trouvé:', jourData ? jourData.date : 'AUCUN');
-    if (jourData) console.log('[bandeau] intentions:', jourData.intentions.map(i => i.nom));
-    // Log les 3 jours autour d'aujourd'hui pour comparaison
-    const idx = data.jours.findIndex(j => j.date === todayISO);
-    if (idx >= 0) {
-      for (let i = Math.max(0, idx-1); i <= Math.min(data.jours.length-1, idx+1); i++) {
-        const j = data.jours[i];
-        console.log(`[bandeau] j[${i}] date=${j.date} intentions=${j.intentions.map(x=>x.nom).join(',')}`);
-      }
-    }
     const bandeau = document.getElementById('intention-jour');
     if (!jourData || !jourData.intentions.length) {
       bandeau.style.display = 'none';
@@ -1345,7 +1333,7 @@ async function chargerIntentionJour() {
     const texte = jourData.intentions.map(i => i.nom.replace(/^RIP - /, '✝\u00a0')).join('\u2003·\u2003');
     bandeau.textContent = texte;
     bandeau.style.display = 'block';
-  } catch(e) { console.error('[bandeau] erreur:', e); }
+  } catch(e) { /* silencieux */ }
 }
 chargerIntentionJour();
 

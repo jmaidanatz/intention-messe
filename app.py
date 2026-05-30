@@ -12,7 +12,8 @@ import hashlib
 import asyncio
 import logging
 from pathlib import Path
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from functools import lru_cache
 from typing import Optional
 
@@ -35,6 +36,34 @@ NOTION_API   = "https://api.notion.com/v1"
 NOTION_VER   = "2022-06-28"
 MAX_SEARCH   = 730           # ~2 ans
 CACHE_TTL    = 300           # secondes : durée de vie du cache des intentions
+
+PARIS_TZ = ZoneInfo("Europe/Paris")
+
+
+def parse_date_notion(valeur: str) -> date:
+    """
+    Convertit une valeur de date Notion en `date`, robuste aux deux formats :
+      - date simple : "2026-05-30"
+      - datetime avec timezone : "2026-05-30T00:00:00.000+02:00" ou "...Z"
+    Pour les datetimes, on convertit vers le fuseau de Paris avant d'extraire
+    la date — sinon une intention à minuit Paris stockée en UTC (22h la veille)
+    serait lue avec un jour de retard.
+    """
+    if "T" not in valeur:
+        return date.fromisoformat(valeur)
+    # datetime : normaliser le "Z" en "+00:00" puis convertir vers Paris
+    iso = valeur.replace("Z", "+00:00")
+    dt = datetime.fromisoformat(iso)
+    if dt.tzinfo is None:
+        # datetime sans timezone → supposé déjà en heure locale Paris
+        return dt.date()
+    return dt.astimezone(PARIS_TZ).date()
+
+
+def aujourd_hui() -> date:
+    """Date du jour en heure de Paris (le serveur Railway tourne en UTC)."""
+    return datetime.now(PARIS_TZ).date()
+
 
 VAPID_PUBLIC_KEY  = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
@@ -157,8 +186,8 @@ async def _fetch_all_intentions_notion() -> list[dict]:
                         "nom":         nom,
                         "demandeur":   demandeur,
                         "description": description,
-                        "date_start":  date.fromisoformat(date_prop["start"]),
-                        "date_end":    date.fromisoformat(date_prop["end"]) if date_prop.get("end") else None,
+                        "date_start":  parse_date_notion(date_prop["start"]),
+                        "date_end":    parse_date_notion(date_prop["end"]) if date_prop.get("end") else None,
                         "fixe":        nom.rstrip().endswith("♦"),
                     })
             if not data.get("has_more"):
@@ -275,7 +304,7 @@ def est_libre(jour: date, map_jour: dict) -> bool:
 
 
 def trouver_date_libre(depuis: date, map_jour: dict, duree: int = 1) -> Optional[date]:
-    today   = date.today()
+    today   = aujourd_hui()
     plafond = depuis + timedelta(days=MAX_SEARCH)
     cur     = depuis
     while cur <= plafond:
@@ -369,7 +398,7 @@ def trouver_date_non_bloquee(depuis: date, map_jour: dict, today: date,
 
 def detect_violations(intentions: list[dict]) -> list[dict]:
     map_jour = build_map_jour(intentions)
-    aujourd = date.today()
+    aujourd = aujourd_hui()
     viol = []
     for jour, occs in map_jour.items():
         if jour < aujourd:
@@ -610,7 +639,7 @@ async def api_calendrier_plage(request: Request, forcer: bool = False):
     Le cache serveur fait qu'un seul chargement Notion est nécessaire."""
     intentions = await fetch_all_intentions(forcer=forcer)
     map_jour   = build_map_jour(intentions)
-    today = date.today()
+    today = aujourd_hui()
     mois_data = {}
     for dm in range(-3, 12):
         m = today.month + dm
@@ -666,7 +695,7 @@ async def api_corriger_violations(request: Request):
     - les déplace vers la date libre la plus proche de leur date actuelle
       (cherche d'abord J-1, J+1, J-2, J+2… pour minimiser le décalage)
     """
-    today = date.today()
+    today = aujourd_hui()
     intentions = await fetch_all_intentions()
     violations = detect_violations(intentions)   # déjà filtrées ≥ aujourd'hui
 
@@ -773,7 +802,7 @@ async def api_verifier_date(request: Request, req: VerificationRequest):
     """
     if not _est_authentifie(request):
         raise HTTPException(401, "Non authentifié")
-    today = date.today()
+    today = aujourd_hui()
     intentions = await fetch_all_intentions()
     map_jour   = build_map_jour(intentions)
     dqp        = req.des_que_possible
@@ -886,7 +915,7 @@ async def api_verifier_date(request: Request, req: VerificationRequest):
 @app.post("/api/inserer")
 async def api_inserer(request: Request, req: InsertionRequest):
     if not _est_authentifie(request): raise HTTPException(401, "Non authentifié")
-    today = date.today()
+    today = aujourd_hui()
 
     # Validation entrée
     nom = (req.nom or "").strip()
@@ -1170,7 +1199,7 @@ def _texte_intentions_du_jour(occs: list[dict], jour: date) -> tuple[str, str]:
 
 
 async def tache_notification_matin():
-    aujourd = date.today()
+    aujourd = aujourd_hui()
     try:
         intentions = await fetch_all_intentions(forcer=True)
     except Exception as e:
@@ -1273,7 +1302,7 @@ async def push_status(device_id: str = "default"):
 @app.post("/api/push/test")
 async def push_test(device_id: str = "default"):
     """Envoie une notification de test à un appareil spécifique (ou tous si device_id=all)."""
-    aujourd = date.today()
+    aujourd = aujourd_hui()
     try:
         occs = build_map_jour(await fetch_all_intentions()).get(aujourd, [])
     except Exception:
