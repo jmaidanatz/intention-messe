@@ -376,25 +376,27 @@
 
   /* ── Bouton notifications ── */
   #btn-notif {
-    background: transparent;
-    border: 1px solid var(--bordure);
-    border-radius: var(--radius);
+    background: var(--blanc);
+    border: 1.5px solid var(--bordure);
+    border-radius: 50%;
     color: var(--texte2);
-    font-family: 'DM Sans', sans-serif;
-    font-size: .72rem;
-    font-weight: 600;
-    letter-spacing: .07em;
-    text-transform: uppercase;
-    padding: .45rem .9rem;
+    font-size: 1.05rem;
+    padding: .28rem .38rem;
     cursor: pointer;
     transition: var(--trans);
     display: inline-flex;
     align-items: center;
-    gap: .35rem;
-    white-space: nowrap;
+    justify-content: center;
+    line-height: 1;
+    width: 32px;
+    height: 32px;
   }
-  #btn-notif:hover { border-color: var(--teal); color: var(--teal); }
-  #btn-notif.actif { background: var(--teal); border-color: var(--teal); color: #fff; }
+  #btn-notif:hover { border-color: var(--teal); }
+  #btn-notif.actif {
+    background: #2e7d32;
+    border-color: #2e7d32;
+    color: #fff;
+  }
   /* ── Spinner ── */
   .spinner { display: inline-block; width: 14px; height: 14px; border: 1.5px solid var(--bordure); border-top-color: var(--teal); border-radius: 50%; animation: spin .65s linear infinite; }
   .spinner.cache { display: none; }
@@ -496,7 +498,7 @@
   <a href="/logout" id="btn-logout" title="Se déconnecter">⊘</a>
 </header>
 
-<div id="intention-jour" style="display:none;background:var(--teal);color:#fff;padding:.55rem 1.2rem;font-size:.85rem;font-family:'Cormorant Garamond',serif;font-style:italic;text-align:center;letter-spacing:.02em"></div>
+<div id="intention-jour" style="display:none;background:var(--teal);color:#fff;padding:.55rem 1.2rem;font-size:.75rem;font-family:'DM Sans',sans-serif;font-weight:400;text-align:center;letter-spacing:.04em;text-transform:uppercase"></div>
 
 <nav>
   <button class="nav-btn actif" data-section="inserer" onclick="naviguerVers('inserer')">Insérer</button>
@@ -858,7 +860,9 @@ function ouvrirPopupJour(j) {
         else                             pbLabel = 'période';
       }
       const pb = pbLabel ? `<span class="badge badge-periode">${pbLabel}</span>` : '';
-      li.innerHTML = `<span class="nom-int">${i.nom}${fb}${pb}</span><span class="dem-int">${i.demandeur || '—'}</span>`;
+      // Retirer le ♦ de fin du nom (il est déjà dans le badge fb)
+      const nomAffiche = i.nom.replace(/\s*♦\s*$/, '');
+      li.innerHTML = `<span class="nom-int">${nomAffiche}${fb}${pb}</span><span class="dem-int">${i.demandeur || '—'}</span>`;
       ul.appendChild(li);
     });
   }
@@ -1126,12 +1130,12 @@ async function majEtatBoutonNotif() {
     const actif = r && r.ok ? (await r.json()).actif : false;
     if (perm === 'granted' && actif) {
       btnNotif.classList.add('actif');
-      btnNotif.title = 'Notifications actives — cliquer pour désactiver';
-      btnNotif.innerHTML = '🔔 Actif';
+      btnNotif.title = 'Notifications actives — toucher pour désactiver';
+      btnNotif.innerHTML = '🔔';
     } else {
       btnNotif.classList.remove('actif');
       btnNotif.title = 'Activer les notifications du matin (6h45)';
-      btnNotif.innerHTML = '🔔';
+      btnNotif.innerHTML = '🔕';
     }
   } catch(e) { console.warn('majEtatBoutonNotif:', e); }
 }
