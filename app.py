@@ -411,6 +411,7 @@ class InsertionRequest(BaseModel):
     date_souhaitee:   Optional[str] = None
     date_fin:         Optional[str] = None
     des_que_possible: bool = False   # Se glisser sur le 1er jour non bloqué par ♦
+    date_precise:     bool = False   # Passé depuis l'étape Vérifier
     force_date:       bool = False
 
 
@@ -756,6 +757,132 @@ async def api_corriger_violations(request: Request):
     }
 
 
+class VerificationRequest(BaseModel):
+    date_souhaitee:   Optional[str] = None
+    date_fin:         Optional[str] = None
+    des_que_possible: bool = False
+    duree:            int = 1   # 1=simple, 9=neuvaine, 30=trentain
+
+
+@app.post("/api/verifier-date")
+async def api_verifier_date(request: Request, req: VerificationRequest):
+    """
+    Calcule la date disponible sans rien écrire dans Notion.
+    Retourne la date proposée, les intentions déjà présentes ce jour,
+    et les déplacements qui seraient nécessaires.
+    """
+    if not _est_authentifie(request):
+        raise HTTPException(401, "Non authentifié")
+    today = date.today()
+    intentions = await fetch_all_intentions()
+    map_jour   = build_map_jour(intentions)
+    dqp        = req.des_que_possible
+
+    # ── Calculer la date cible (même logique que api_inserer) ──
+    if req.date_souhaitee:
+        try:
+            cible = date.fromisoformat(req.date_souhaitee)
+        except ValueError:
+            raise HTTPException(400, "Format de date invalide.")
+        date_precise = True
+        if dqp:
+            cap_c   = capacite(cible)
+            bloques = [o for o in map_jour.get(cible, [])
+                       if o["fixe"] or est_inamovible(o, today)]
+            if len(bloques) >= cap_c:
+                nouvelle = trouver_date_non_bloquee(cible, map_jour, today)
+                if nouvelle is None:
+                    raise HTTPException(404, "Aucune date disponible.")
+                cible        = nouvelle
+                date_precise = False
+    elif dqp:
+        cible = trouver_date_non_bloquee(today, map_jour, today)
+        if cible is None:
+            raise HTTPException(404, "Aucune date disponible.")
+        date_precise = False
+    else:
+        cible = trouver_date_libre(today, map_jour)
+        if cible is None:
+            raise HTTPException(404, "Aucune date libre.")
+        date_precise = False
+
+    # Calculer date_fin si période
+    cible_end: Optional[date] = None
+    if req.date_fin:
+        try:
+            cible_end = date.fromisoformat(req.date_fin)
+        except ValueError:
+            raise HTTPException(400, "Format de date_fin invalide.")
+    elif req.duree > 1:
+        cible_end = cible + timedelta(days=req.duree - 1)
+
+    # ── Analyser les occupants et déplacements nécessaires ──
+    occupants_bloc: list[dict] = []
+    for offset in range((cible_end - cible).days + 1 if cible_end else 1):
+        j = cible + timedelta(days=offset)
+        for occ in map_jour.get(j, []):
+            if occ not in occupants_bloc:
+                occupants_bloc.append(occ)
+
+    a_deplacer: list[dict] = []
+    for offset in range((cible_end - cible).days + 1 if cible_end else 1):
+        j   = cible + timedelta(days=offset)
+        cap = capacite(j)
+        occs_j    = map_jour.get(j, [])
+        inamo_j   = [o for o in occs_j if o["fixe"] or est_inamovible(o, today)]
+        sans_f_j  = [o for o in occs_j if not o["fixe"] and not est_inamovible(o, today)]
+        places    = cap - len(inamo_j) - 1
+        if places < 0:
+            raise HTTPException(409, f"Le {j.isoformat()} est saturé par des intentions fixes.")
+        sans_tri = sorted(sans_f_j, key=lambda o: (o["date_start"], o["id"]), reverse=True)
+        for o in sans_tri[:len(sans_f_j) - places]:
+            if o not in a_deplacer:
+                a_deplacer.append(o)
+
+    # Calculer les nouvelles dates pour les déplacements (simulation, sans écriture)
+    map_sim = {j: list(occs) for j, occs in map_jour.items()}
+    deplacements_prevus = []
+    dernier_bloc = cible_end if cible_end else cible
+    for intention in sorted(a_deplacer, key=lambda o: (o["date_start"], o["id"])):
+        duree_int = (intention["date_end"] - intention["date_start"]).days + 1                     if intention["date_end"] else 1
+        d_from = max(intention["date_start"] + timedelta(days=1),
+                     dernier_bloc + timedelta(days=1))
+        nd = trouver_date_libre(d_from, map_sim, duree_int)
+        if nd:
+            new_end = (nd + timedelta(days=duree_int - 1)) if duree_int > 1 else None
+            deplacements_prevus.append({
+                "nom":           intention["nom"],
+                "demandeur":     intention["demandeur"],
+                "ancienne_date": intention["date_start"].isoformat(),
+                "nouvelle_date": nd.isoformat(),
+            })
+            # Mettre à jour la simulation locale
+            cur = intention["date_start"]
+            fin = intention["date_end"] or cur
+            while cur <= fin:
+                if cur in map_sim and intention in map_sim[cur]:
+                    map_sim[cur].remove(intention)
+                cur += timedelta(days=1)
+            i_dep = dict(intention)
+            i_dep["date_start"] = nd; i_dep["date_end"] = new_end
+            cur = nd; fin2 = new_end or nd
+            while cur <= fin2:
+                map_sim.setdefault(cur, []).append(i_dep)
+                cur += timedelta(days=1)
+
+    return {
+        "date":          cible.isoformat(),
+        "date_fin":      cible_end.isoformat() if cible_end else None,
+        "date_precise":  date_precise,
+        "capacite":      capacite(cible),
+        "intentions_presentes": [
+            {"nom": o["nom"], "demandeur": o["demandeur"], "fixe": o["fixe"]}
+            for o in map_jour.get(cible, [])
+        ],
+        "deplacements_prevus": deplacements_prevus,
+    }
+
+
 @app.post("/api/inserer")
 async def api_inserer(request: Request, req: InsertionRequest):
     if not _est_authentifie(request): raise HTTPException(401, "Non authentifié")
@@ -775,37 +902,24 @@ async def api_inserer(request: Request, req: InsertionRequest):
     intentions = await fetch_all_intentions()
     map_jour   = build_map_jour(intentions)
 
-    # Date cible selon le mode choisi
-    dqp = req.des_que_possible  # alias court
+    # Date cible : passée depuis l'étape Vérifier (req.date_souhaitee = date retenue)
+    # Si pour une raison quelconque elle n'est pas fournie, recalculer.
+    dqp = req.des_que_possible
 
     if req.date_souhaitee:
         try:
             cible = date.fromisoformat(req.date_souhaitee)
         except ValueError:
             raise HTTPException(400, "Format de date invalide (attendu YYYY-MM-DD).")
-        date_precise = True
-        if dqp:
-            # Date souhaitée + "Dès que possible" :
-            # Si la date souhaitée est bloquée (♦/inamovible saturant), chercher
-            # le 1er jour non bloqué à partir de cette date.
-            cap_c   = capacite(cible)
-            bloques = [o for o in map_jour.get(cible, [])
-                       if o["fixe"] or est_inamovible(o, today)]
-            if len(bloques) >= cap_c:
-                nouvelle = trouver_date_non_bloquee(cible, map_jour, today)
-                if nouvelle is None:
-                    raise HTTPException(404, "Aucune date disponible dans les 365 prochains jours.")
-                cible = nouvelle
-                date_precise = True   # date calculée → on ajoute ♦
+        # date_precise est passé explicitement depuis le frontend (choix de l'utilisateur
+        # sur la case "Bloquer cette date ♦" à l'étape 2)
+        date_precise = req.date_precise
     elif dqp:
-        # Pas de date souhaitée + "Dès que possible" :
-        # 1er jour à partir d'aujourd'hui non bloqué par ♦ (peut contenir des sans-♦)
         cible = trouver_date_non_bloquee(today, map_jour, today)
         if cible is None:
             raise HTTPException(404, "Aucune date disponible dans les 365 prochains jours.")
-        date_precise = True
+        date_precise = False
     else:
-        # Comportement classique : 1er jour totalement libre
         cible = trouver_date_libre(today, map_jour)
         if cible is None:
             raise HTTPException(404, "Aucune date libre dans les 365 prochains jours.")

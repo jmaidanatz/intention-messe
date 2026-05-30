@@ -512,44 +512,67 @@
   <!-- ── INSÉRER ── -->
   <div class="section active" id="inserer">
     <div class="titre-section">Nouvelle intention</div>
-    <div class="carte">
-      <form id="form-insertion">
-        <div class="grille">
-          <div class="champ" style="grid-column:1/-1">
-            <label>Nom *</label>
-            <input type="text" id="nom" placeholder="ex. RIP — Jean Dupont  ou  Guérison de Marie" required>
-          </div>
-          <div class="champ">
-            <label>Demandeur</label>
-            <input type="text" id="demandeur" placeholder="ex. Mme Martin">
-          </div>
-          <div class="champ">
-            <label>Date souhaitée</label>
-            <input type="date" id="date_souhaitee">
-            <label class="toggle-dqp" id="label-dqp">
-              <input type="checkbox" id="des_que_possible">
-              <span>Dès que possible</span>
-            </label>
-          </div>
-          <div class="champ" style="grid-column:1/-1">
-            <label>Durée</label>
-            <div class="duree-btns" id="duree-btns">
-              <button type="button" class="btn-duree actif" data-duree="1">Un jour</button>
-              <button type="button" class="btn-duree" data-duree="9">Neuvaine</button>
-              <button type="button" class="btn-duree" data-duree="30">Trentain</button>
-            </div>
-          </div>
-          <div class="champ" style="grid-column:1/-1">
-            <label>Note</label>
-            <textarea id="description" placeholder="Précision contextuelle…"></textarea>
+
+    <!-- Étape 1 : saisie -->
+    <div class="carte" id="etape1">
+      <div class="grille">
+        <div class="champ" style="grid-column:1/-1">
+          <label>Nom *</label>
+          <input type="text" id="nom" placeholder="ex. RIP — Jean Dupont  ou  Guérison de Marie">
+        </div>
+        <div class="champ">
+          <label>Demandeur</label>
+          <input type="text" id="demandeur" placeholder="ex. Mme Martin">
+        </div>
+        <div class="champ">
+          <label>Date souhaitée</label>
+          <input type="date" id="date_souhaitee">
+          <label class="toggle-dqp">
+            <input type="checkbox" id="des_que_possible">
+            <span>Dès que possible</span>
+          </label>
+        </div>
+        <div class="champ" style="grid-column:1/-1">
+          <label>Durée</label>
+          <div class="duree-btns" id="duree-btns">
+            <button type="button" class="btn-duree actif" data-duree="1">Un jour</button>
+            <button type="button" class="btn-duree" data-duree="9">Neuvaine</button>
+            <button type="button" class="btn-duree" data-duree="30">Trentain</button>
           </div>
         </div>
-        <div class="btn-row">
-          <button type="submit" class="btn btn-teal">Insérer</button>
-          <span class="spinner cache" id="spin-inserer"></span>
+        <div class="champ" style="grid-column:1/-1">
+          <label>Note</label>
+          <textarea id="description" placeholder="Précision contextuelle…"></textarea>
         </div>
-      </form>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-teal" id="btn-verifier">Vérifier</button>
+        <span class="spinner cache" id="spin-verifier"></span>
+      </div>
     </div>
+
+    <!-- Étape 2 : confirmation (cachée jusqu'au Vérifier) -->
+    <div class="carte" id="etape2" style="display:none">
+      <div id="verif-date-affichage" style="margin-bottom:1rem">
+        <div style="font-size:.72rem;font-weight:600;color:var(--texte2);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.35rem">Date proposée</div>
+        <div id="verif-date-val" style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:500;color:var(--texte)"></div>
+        <div id="verif-date-info" style="font-size:.82rem;color:var(--texte3);margin-top:.2rem"></div>
+      </div>
+      <div id="verif-deplacements" style="display:none;margin-bottom:1rem">
+        <div style="font-size:.72rem;font-weight:600;color:var(--texte2);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.35rem">Déplacements prévus</div>
+        <div id="verif-dep-liste" style="font-size:.84rem;color:var(--texte2)"></div>
+      </div>
+      <label class="toggle-dqp" style="margin-bottom:1rem">
+        <input type="checkbox" id="bloquer-date">
+        <span>Bloquer cette date (♦)</span>
+      </label>
+      <div class="btn-row">
+        <button type="button" class="btn btn-teal" id="btn-inserer-final">Insérer</button>
+        <button type="button" class="btn btn-ghost" id="btn-retour">← Modifier</button>
+        <span class="spinner cache" id="spin-inserer"></span>
+      </div>
+    </div>
+
     <div class="message" id="msg-inserer"></div>
   </div>
 
@@ -874,56 +897,128 @@ document.getElementById('popup-overlay').addEventListener('click', e => {
 });
 
 // ── Formulaire ───────────────────────────────────────────────────────────────
-document.getElementById('form-insertion').addEventListener('submit', async e => { e.preventDefault(); await soumettreForme(false); });
+// ── Données retenues après Vérifier ──────────────────────────────────────────
+let _verifData = null;   // résultat de /api/verifier-date
 
-async function soumettreForme(force = false) {
+// Vérifier
+document.getElementById('btn-verifier').addEventListener('click', async () => {
+  const nom = document.getElementById('nom').value.trim();
+  if (!nom) { afficherMsg('erreur', 'Le nom est requis.', 'msg-inserer'); return; }
+  const spin = document.getElementById('spin-verifier');
+  const msg  = document.getElementById('msg-inserer');
+  spin.classList.remove('cache'); msg.className = 'message';
+  const duree = parseInt(document.querySelector('.btn-duree.actif').dataset.duree);
+  const dateSouhaitee = document.getElementById('date_souhaitee').value || null;
+  const body = {
+    date_souhaitee:   dateSouhaitee,
+    date_fin:         calculerDateFin(dateSouhaitee, duree),
+    des_que_possible: document.getElementById('des_que_possible').checked,
+    duree:            duree,
+  };
+  try {
+    const r = await fetch('/api/verifier-date', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) { afficherMsg('erreur', data.detail || 'Erreur', 'msg-inserer'); return; }
+    _verifData = data;
+    // Afficher étape 2
+    document.getElementById('verif-date-val').textContent = fmtDate(data.date) + (data.date_fin ? ' → ' + fmtDate(data.date_fin) : '');
+    // Info capacité et présents
+    const nb = data.intentions_presentes.length;
+    const cap = data.capacite;
+    let info = `Capacité : ${cap}  ·  ${nb} intention${nb>1?'s':''} présente${nb>1?'s':''}`;
+    if (data.date !== (dateSouhaitee || '')) info = 'Date ajustée  ·  ' + info;
+    document.getElementById('verif-date-info').textContent = info;
+    // Déplacements prévus
+    const depDiv = document.getElementById('verif-deplacements');
+    if (data.deplacements_prevus.length) {
+      let depHtml = '';
+      data.deplacements_prevus.forEach(d => {
+        depHtml += `· <em>${d.nom}</em> : ${fmtDate(d.ancienne_date)} → ${fmtDate(d.nouvelle_date)}<br>`;
+      });
+      document.getElementById('verif-dep-liste').innerHTML = depHtml;
+      depDiv.style.display = 'block';
+    } else {
+      depDiv.style.display = 'none';
+    }
+    // Pré-cocher ♦ si date_precise
+    document.getElementById('bloquer-date').checked = data.date_precise;
+    // Basculer les étapes
+    document.getElementById('etape2').style.display = 'block';
+    document.getElementById('etape2').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch(e) { afficherMsg('erreur', 'Erreur réseau : ' + e.message, 'msg-inserer'); }
+  finally { spin.classList.add('cache'); }
+});
+
+// Retour à l'étape 1
+document.getElementById('btn-retour').addEventListener('click', () => {
+  document.getElementById('etape2').style.display = 'none';
+  _verifData = null;
+});
+
+// Insérer (étape 2)
+document.getElementById('btn-inserer-final').addEventListener('click', async () => {
+  if (!_verifData) return;
   const spin = document.getElementById('spin-inserer');
   const msg  = document.getElementById('msg-inserer');
   spin.classList.remove('cache'); msg.className = 'message';
   const body = {
-    nom:            document.getElementById('nom').value.trim(),
-    demandeur:      document.getElementById('demandeur').value.trim() || null,
-    description:    document.getElementById('description').value.trim() || null,
-    date_souhaitee: document.getElementById('date_souhaitee').value || null,
-    date_fin:           calculerDateFin(document.getElementById('date_souhaitee').value || null, parseInt(document.querySelector('.btn-duree.actif').dataset.duree)),
-    des_que_possible:   document.getElementById('des_que_possible').checked,
-    force_date:         force,
+    nom:              document.getElementById('nom').value.trim(),
+    demandeur:        document.getElementById('demandeur').value.trim() || null,
+    description:      document.getElementById('description').value.trim() || null,
+    date_souhaitee:   _verifData.date,
+    date_fin:         _verifData.date_fin,
+    des_que_possible: document.getElementById('des_que_possible').checked,
+    date_precise:     document.getElementById('bloquer-date').checked,
+    force_date:       false,
   };
   try {
     const r = await fetch('/api/inserer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await r.json();
     if (r.status === 409) {
       if (data.code === 'DATE_PASSEE') {
-        demanderConfirmation('Date dans le passé', `La date <strong>${fmtDate(data.date)}</strong> est dans le passé. Confirmer ?`, () => soumettreForme(true));
-      } else if (data.code === 'TROP_DEPLACEMENTS') {
-        const liste = data.intentions.map(i => `<br>· ${i.nom} <span style="color:var(--texte3)">(${fmtDate(i.date)})</span>`).join('');
-        demanderConfirmation('Déplacements multiples', `${data.intentions.length} intentions seront déplacées :${liste}<br><br>Confirmer ?`, () => soumettreForme(true));
+        demanderConfirmation('Date dans le passé', `La date <strong>${fmtDate(data.date)}</strong> est dans le passé. Confirmer ?`, async () => {
+          body.force_date = true;
+          const r2 = await fetch('/api/inserer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+          const d2 = await r2.json();
+          afficherSucces(d2);
+        });
       } else { afficherMsg('erreur', data.message || 'Erreur', 'msg-inserer'); }
       return;
     }
     if (!r.ok) { afficherMsg('erreur', data.detail || 'Erreur serveur', 'msg-inserer'); return; }
-    let fin = data.intention.date_fin ? ` → ${fmtDate(data.intention.date_fin)}` : '';
-    let html = `Intention insérée : <strong>${data.intention.nom}</strong> — ${fmtDate(data.intention.date)}${fin}`;
-    if (data.deplacements.length) {
-      html += '<br><br><span style="font-weight:600">Déplacements :</span>';
-      data.deplacements.forEach(d => { html += `<br>· <em>${d.nom}</em> : ${fmtDate(d.ancienne_date)} → ${fmtDate(d.nouvelle_date)}`; });
-    }
-    if (data.alertes && data.alertes.length) {
-      html += '<br><br><span style="font-weight:600;color:var(--rouge)">⚠ Violations résiduelles :</span>';
-      data.alertes.forEach(a => {
-        html += `<br>· ${fmtDate(a.date)} : ${a.count}/${a.capacite}`;
-        a.intentions.forEach(i => { html += `<br>&nbsp;&nbsp;— ${i.nom}${i.demandeur?' ('+i.demandeur+')':''}`; });
-      });
-      afficherMsg('info', html, 'msg-inserer');
-    } else { afficherMsg('succes', html, 'msg-inserer'); }
-    document.getElementById('form-insertion').reset();
-    document.getElementById('des_que_possible').checked = false;
-    document.querySelectorAll('.btn-duree').forEach(b => b.classList.remove('actif'));
-    document.querySelector('.btn-duree[data-duree="1"]').classList.add('actif');
-    // Une insertion peut déplacer des intentions sur plusieurs mois → invalider tout
-    cache = {}; cacheGenere = 0; sauverCache();
+    afficherSucces(data);
   } catch(e) { afficherMsg('erreur', 'Erreur réseau : ' + e.message, 'msg-inserer'); }
   finally { spin.classList.add('cache'); }
+});
+
+function afficherSucces(data) {
+  let fin = data.intention.date_fin ? ` → ${fmtDate(data.intention.date_fin)}` : '';
+  let h = `Intention insérée : <strong>${data.intention.nom}</strong> — ${fmtDate(data.intention.date)}${fin}`;
+  if (data.deplacements.length) {
+    h += '<br><br><span style="font-weight:600">Déplacements :</span>';
+    data.deplacements.forEach(d => { h += `<br>· <em>${d.nom}</em> : ${fmtDate(d.ancienne_date)} → ${fmtDate(d.nouvelle_date)}`; });
+  }
+  if (data.alertes && data.alertes.length) {
+    h += '<br><br><span style="font-weight:600;color:var(--rouge)">⚠ Violations résiduelles :</span>';
+    data.alertes.forEach(a => {
+      h += `<br>· ${fmtDate(a.date)} : ${a.count}/${a.capacite}`;
+      a.intentions.forEach(i => { h += `<br>&nbsp;&nbsp;— ${i.nom}${i.demandeur?' ('+i.demandeur+')':''}`; });
+    });
+    afficherMsg('info', h, 'msg-inserer');
+  } else { afficherMsg('succes', h, 'msg-inserer'); }
+  // Reset
+  document.getElementById('nom').value = '';
+  document.getElementById('demandeur').value = '';
+  document.getElementById('description').value = '';
+  document.getElementById('date_souhaitee').value = '';
+  document.getElementById('des_que_possible').checked = false;
+  document.getElementById('bloquer-date').checked = false;
+  document.getElementById('etape2').style.display = 'none';
+  document.querySelectorAll('.btn-duree').forEach(b => b.classList.remove('actif'));
+  document.querySelector('.btn-duree[data-duree="1"]').classList.add('actif');
+  _verifData = null;
+  cache = {}; cacheGenere = 0; sauverCache();
+  chargerIntentionJour();
 }
 
 // ── Date libre ───────────────────────────────────────────────────────────────
