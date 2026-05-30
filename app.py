@@ -33,7 +33,7 @@ NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_DS_ID = "2d183ba0-7414-8018-ae4d-fee6db4c950d"
 NOTION_API   = "https://api.notion.com/v1"
 NOTION_VER   = "2022-06-28"
-MAX_SEARCH   = 365
+MAX_SEARCH   = 730           # ~2 ans
 CACHE_TTL    = 300           # secondes : durée de vie du cache des intentions
 
 VAPID_PUBLIC_KEY  = os.environ.get("VAPID_PUBLIC_KEY", "")
