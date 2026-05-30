@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intentions de Messes</title>
+<link rel="icon" type="image/png" href="/static/icon-192.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1d4e5f" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111a1e" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Intentions">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fond:      #faf8f4;
+    --fond2:     #f2ede4;
+    --blanc:     #ffffff;
+    --teal:      #1d4e5f;
+    --teal2:     #266070;
+    --or:        #b8903a;
+    --texte:     #1a1410;
+    --texte2:    #6b5f52;
+    --texte3:    #a39787;
+    --bordure:   #ddd5c8;
+    --vert:      #2d6a4f;
+    --rouge:     #9b2335;
+    --radius:    4px;
+    --shadow:    0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+    --trans:     .18s ease;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--fond);
+    color: var(--texte);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--blanc);
+    border-bottom: 1px solid var(--bordure);
+    padding: 0 1.4rem;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  header img { height: 30px; width: 30px; object-fit: contain; border-radius: 3px; }
+  .header-sep { width: 1px; height: 20px; background: var(--bordure); }
+  header h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--texte);
+    letter-spacing: .02em;
+  }
+
+  /* ── Nav ── */
+  nav {
+    display: flex;
+    justify-content: center;
+    border-bottom: 1.5px solid var(--bordure);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  nav::-webkit-scrollbar { display: none; }
+  .nav-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1.5px;
+    color: var(--texte2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: .82rem;
+    font-weight: 400;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: .7rem 1.6rem;
+    cursor: pointer;
+    transition: var(--trans);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .nav-btn:hover { color: var(--texte); }
+  .nav-btn.actif { color: var(--teal); border-bottom-color: var(--teal); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    nav { justify-content: stretch; }
+    .nav-btn {
+      font-size: .7rem;
+      padding: .85rem 0;
+      letter-spacing: .04em;
+      flex: 1;
+      justify-content: center;
+      text-align: center;
+      min-width: 0;
+    }
+  }
+
+  /* ── Wrap ── */
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 1.8rem 1.2rem; }
+
+  /* ── Sections ── */
+  .section { display: none; }
+  .section.active { display: block; animation: fadeIn .18s ease; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:none; } }
+
+  .titre-section {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--texte);
+    margin-bottom: 1.2rem;
+    letter-spacing: .01em;
+  }
+
+  /* ── Carte ── */
+  .carte {
+    background: var(--blanc);
+    border: 1px solid var(--bordure);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  /* ── Formulaire ── */
+  .grille { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
+  @media (max-width: 520px) { .grille { grid-template-columns: 1fr; } }
+  .champ { display: flex; flex-direction: column; gap: .35rem; }
+  .champ label {
+    font-size: .72rem; font-weight: 600; color: var(--texte2);
+    letter-spacing: .07em; text-transform: uppercase;
+  }
+  .champ input, .champ textarea {
+    background: var(--fond); border: 1px solid var(--bordure);
+    border-radius: var(--radius); color: var(--texte);
+    font-family: 'DM Sans', sans-serif; font-size: .95rem;
+    padding: .6rem .85rem; transition: var(--trans); outline: none;
+  }
+  .champ input:focus, .champ textarea:focus {
+    border-color: var(--teal); background: var(--blanc);
+    box-shadow: 0 0 0 3px rgba(29,78,95,.08);
+  }
+  .champ textarea { resize: vertical; min-height: 70px; }
+
+  /* ── Boutons ── */
+  .btn {
+    font-family: 'DM Sans', sans-serif; font-size: .74rem; font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase;
+    padding: .6rem 1.4rem; border-radius: var(--radius); border: none;
+    cursor: pointer; transition: var(--trans);
+    display: inline-flex; align-items: center; gap: .4rem;
+  }
+  .btn-teal { background: var(--teal); color: #fff; }
+  .btn-teal:hover { background: var(--teal2); }
+  .btn-ghost {
+    background: transparent; border: 1px solid var(--bordure); color: var(--texte2);
+  }
+  .btn-ghost:hover { border-color: var(--texte2); color: var(--texte); }
+  .btn-ghost:disabled { opacity: .3; cursor: default; pointer-events: none; }
+  .btn-row { display: flex; gap: .6rem; margin-top: 1.2rem; align-items: center; }
+
+  /* ── Messages ── */
+  .message { border-radius: var(--radius); padding: .85rem 1.1rem; margin: .8rem 0; font-size: .9rem; line-height: 1.55; display: none; }
+  .message.visible { display: block; }
+  .message.succes { background: #edf7f1; border: 1px solid #a8d5bb; color: #1a5c35; }
+  .message.erreur { background: #fdf0f0; border: 1px solid #e8b4b4; color: #7a1c1c; }
+  .message.info   { background: #fdf7ee; border: 1px solid #e8d5a8; color: #6b4c1a; }
+
+  /* ── Calendrier nav ── */
+  .nav-mois {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .8rem;
+    margin-bottom: 1.2rem;
+  }
+  .nav-mois h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--texte);
+    min-width: 180px;
+    text-align: center;
+    letter-spacing: .02em;
+  }
+  .btn-actualiser { margin-left: .4rem; font-size: .7rem; padding: .5rem .9rem; }
+
+  /* ── Grille calendrier (desktop) ── */
+  .grille-cal-wrap { display: block; }
+  .grille-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .entete-cal {
+    text-align: center; font-size: .68rem; font-weight: 600;
+    color: var(--texte3); letter-spacing: .08em; text-transform: uppercase; padding: .35rem 0;
+  }
+  .jour-cal {
+    background: var(--blanc); border: 1px solid var(--bordure);
+    border-radius: var(--radius); min-height: 74px;
+    padding: .38rem .42rem; cursor: pointer; transition: var(--trans);
+    position: relative; overflow: hidden;
+  }
+  .jour-cal:hover { border-color: var(--teal); z-index: 1; }
+  .jour-cal.vide { background: transparent; border: none; cursor: default; }
+  .jour-cal.aujourd-hui { border-color: var(--teal); }
+  .jour-cal.aujourd-hui .num-jour { color: var(--teal); font-weight: 600; }
+  .jour-cal.violation { background: #fdf0f0; border-color: #e8b4b4; }
+  .num-jour { font-family: 'Cormorant Garamond', serif; font-size: .95rem; display: block; margin-bottom: .12rem; color: var(--texte); }
+  .dot-libre { position: absolute; top: .38rem; right: .42rem; width: 6px; height: 6px; border-radius: 50%; background: var(--vert); }
+  .dot-viol  { position: absolute; top: .38rem; right: .42rem; width: 6px; height: 6px; border-radius: 50%; background: var(--rouge); }
+  .cap-ind   { position: absolute; bottom: .28rem; right: .42rem; font-size: .6rem; color: var(--texte3); }
+  .intention-mini { font-size: .65rem; color: var(--texte2); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; }
+  .intention-mini.fixe { color: var(--or); }
+
+  /* ── Vue planning (mobile) ── */
+  .planning-cal { display: none; }
+  .planning-jour {
+    border-bottom: 1px solid var(--bordure);
+    padding: .9rem 0;
+    cursor: pointer;
+    transition: background var(--trans);
+  }
+  .planning-jour:active { background: var(--fond2); }
+  .planning-jour.aujourd-hui .planning-date { color: var(--teal); font-weight: 600; }
+  .planning-jour.violation .planning-date   { color: var(--rouge); }
+
+  .planning-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .5rem;
+  }
+  .planning-date {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.05rem;
+    font-weight: 400;
+    color: var(--texte);
+    min-width: 120px;
+    flex-shrink: 0;
+    line-height: 1.3;
+  }
+  .planning-right {
+    margin-left: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .18rem;
+    flex-shrink: 0;
+  }
+  .planning-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .planning-cap { font-size: .72rem; color: var(--texte3); line-height: 1; }
+
+  .planning-intentions { padding: .3rem 0 0 0; }
+  .planning-int {
+    font-size: .88rem;
+    color: var(--texte2);
+    padding: .12rem 0;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .planning-int.fixe { color: var(--or); }
+  .planning-libre { font-size: .82rem; color: var(--vert); font-style: italic; padding: .12rem 0; }
+
+  @media (max-width: 640px) {
+    .grille-cal-wrap { display: none; }
+    .planning-cal    { display: block; }
+  }
+  @media (min-width: 641px) {
+    .grille-cal-wrap { display: block; }
+    .planning-cal    { display: none; }
+  }
+
+  /* ── Légende ── */
+  .legende { display: flex; gap: 1.2rem; margin-bottom: .9rem; font-size: .72rem; color: var(--texte3); align-items: center; flex-wrap: wrap; }
+  .leg-item { display: flex; align-items: center; gap: .3rem; }
+  .leg-dot  { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* ── Date libre ── */
+  .result-libre { background: var(--blanc); border: 1px solid var(--bordure); border-radius: var(--radius); padding: 1.3rem 1.5rem; margin-top: .9rem; display: none; box-shadow: var(--shadow); }
+  .result-libre.visible { display: block; }
+  .date-libre-val { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 600; color: var(--texte); margin-bottom: .3rem; }
+
+  /* ── Violations ── */
+  .violation-item { background: #fdf5f5; border: 1px solid #e8c4c4; border-radius: var(--radius); padding: .95rem 1.2rem; margin-bottom: .7rem; }
+  .violation-date { font-family: 'Cormorant Garamond', serif; font-size: 1rem; color: var(--rouge); margin-bottom: .4rem; font-weight: 600; }
+
+  /* ── Popup ── */
+  .popup-overlay { position: fixed; inset: 0; background: rgba(26,20,16,.45); z-index: 200; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+  .popup-overlay.visible { display: flex; }
+  .popup { background: var(--blanc); border: 1px solid var(--bordure); border-radius: 6px; padding: 1.7rem 2rem; max-width: 440px; width: 95%; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,.14); animation: popIn .18s ease; }
+  @keyframes popIn { from { opacity:0; transform:scale(.97) translateY(5px); } to { opacity:1; transform:none; } }
+  .popup h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 700; color: var(--texte); margin-bottom: 1rem; padding-bottom: .7rem; border-bottom: 1px solid var(--bordure); }
+  .liste-intentions { list-style: none; }
+  .liste-intentions li { padding: .6rem 0; border-bottom: 1px solid var(--fond2); font-size: .9rem; }
+  .liste-intentions li:last-child { border: none; }
+  .nom-int  { color: var(--texte); }
+  .dem-int  { color: var(--texte3); font-size: .78rem; display: block; margin-top: .1rem; }
+  .badge { display: inline-block; border-radius: 3px; padding: .08rem .32rem; font-size: .64rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin-left: .35rem; vertical-align: middle; }
+  .badge-fixe    { background: #fdf7ee; color: var(--or);   border: 1px solid #e8d5a8; }
+  .badge-periode { background: #edf7f1; color: var(--vert); border: 1px solid #a8d5bb; }
+
+
+  /* ── PWA ── */
+  #btn-install {
+    display: none;
+    margin-left: auto;
+    background: var(--teal);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif;
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: .45rem 1rem;
+    cursor: pointer;
+    gap: .35rem;
+    align-items: center;
+    transition: var(--trans);
+    white-space: nowrap;
+  }
+  #btn-install:hover { background: var(--teal2); }
+  #btn-install.visible { display: inline-flex; }
+
+  .ios-popup {
+    position: fixed;
+    bottom: 1.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--teal);
+    color: #fff;
+    border-radius: 10px;
+    padding: 1rem 1.4rem;
+    max-width: 320px;
+    width: calc(100% - 2rem);
+    font-size: .86rem;
+    line-height: 1.55;
+    box-shadow: 0 4px 24px rgba(0,0,0,.22);
+    z-index: 300;
+    display: none;
+    animation: slideUp .25s ease;
+  }
+  .ios-popup.visible { display: block; }
+  @keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(12px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+  .ios-popup-titre { font-weight: 600; font-size: .92rem; margin-bottom: .4rem; display: flex; align-items: center; gap: .5rem; }
+  .ios-popup-close { margin-left: auto; cursor: pointer; opacity: .7; font-size: 1.1rem; line-height: 1; }
+  .ios-popup-close:hover { opacity: 1; }
+
+  /* ── Bouton logout ── */
+  #btn-logout {
+    font-size: 1rem;
+    color: var(--texte3);
+    text-decoration: none;
+    padding: .25rem .4rem;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    transition: var(--trans);
+    line-height: 1;
+  }
+  #btn-logout:hover { color: var(--rouge); border-color: var(--rouge); }
+
+  /* ── Bouton notifications ── */
+  #btn-notif {
+    background: var(--blanc);
+    border: 1.5px solid var(--bordure);
+    border-radius: 50%;
+    color: var(--texte2);
+    font-size: 1.05rem;
+    padding: .28rem .38rem;
+    cursor: pointer;
+    transition: var(--trans);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    width: 32px;
+    height: 32px;
+  }
+  #btn-notif:hover { border-color: var(--teal); }
+  #btn-notif.actif {
+    background: #2e7d32;
+    border-color: #2e7d32;
+    color: #fff;
+  }
+  /* ── Spinner ── */
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 1.5px solid var(--bordure); border-top-color: var(--teal); border-radius: 50%; animation: spin .65s linear infinite; }
+  .spinner.cache { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Toggle Dès que possible ── */
+  .toggle-dqp {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    cursor: pointer;
+    font-size: .82rem;
+    font-weight: 400;
+    color: var(--texte2);
+    text-transform: none;
+    letter-spacing: 0;
+    margin-top: .3rem;
+    user-select: none;
+  }
+  .toggle-dqp input[type="checkbox"] {
+    accent-color: var(--teal);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    margin: 0;
+    flex-shrink: 0;
+  }
+  .toggle-dqp:hover { color: var(--texte); }
+
+  /* ── Boutons durée ── */
+  .duree-btns {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+  }
+  .btn-duree {
+    font-family: 'DM Sans', sans-serif;
+    font-size: .78rem;
+    font-weight: 500;
+    letter-spacing: .05em;
+    padding: .5rem 1.2rem;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--bordure);
+    background: transparent;
+    color: var(--texte2);
+    cursor: pointer;
+    transition: var(--trans);
+  }
+  .btn-duree:hover { border-color: var(--teal); color: var(--teal); }
+  .btn-duree.actif {
+    background: var(--teal);
+    border-color: var(--teal);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond:    #111a1e;
+      --fond2:   #1a262c;
+      --blanc:   #1e2d34;
+      --teal:    #4a9cb5;
+      --teal2:   #5ab0cc;
+      --or:      #d4a84b;
+      --texte:   #e8dfd0;
+      --texte2:  #9fb5be;
+      --texte3:  #5e7a85;
+      --bordure: #2a3f48;
+      --vert:    #4aaa7a;
+      --rouge:   #d9566a;
+      --shadow:  0 1px 3px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.2);
+    }
+    /* Corrections spécifiques dark */
+    .message.succes { background: #0d2e1a; border-color: #2a6040; color: #7ecfa0; }
+    .message.erreur { background: #2e0d10; border-color: #6b2030; color: #e08090; }
+    .message.info   { background: #2a2010; border-color: #6b5020; color: #d4a84b; }
+    .violation-item { background: #2e1015; border-color: #6b2030; color: var(--texte2); }
+    .violation-date { color: #e08090; }
+    .result-libre   { background: var(--blanc); }
+    .jour-cal.aujourd-hui { background: #1a2d36; }
+    .jour-cal.violation   { background: #2e1015; border-color: #6b2030; }
+    .badge-fixe    { background: #2a2010; border-color: #6b5020; }
+    .badge-periode { background: #0d2e1a; border-color: #2a6040; }
+    .planning-jour:active { background: #1a262c; }
+    /* Alertes dans le popup et les résultats */
+    .popup { background: var(--blanc); }
+    .liste-intentions li { border-bottom-color: var(--fond2); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="/static/icon-192.png" alt="">
+  <div class="header-sep"></div>
+  <h1>Intentions de Messes</h1>
+  <button id="btn-install" title="Installer l'application">⬇ Installer</button>
+  <button id="btn-notif" title="Notifications du matin">🔔</button>
+  <a href="/logout" id="btn-logout" title="Se déconnecter">⊘</a>
+</header>
+
+<div id="intention-jour" style="display:none;background:var(--teal);color:#fff;padding:.55rem 1.2rem;font-size:.75rem;font-family:'DM Sans',sans-serif;font-weight:400;text-align:center;letter-spacing:.04em;text-transform:uppercase"></div>
+
+<nav>
+  <button class="nav-btn actif" data-section="inserer" onclick="naviguerVers('inserer')">Insérer</button>
+  <button class="nav-btn" data-section="calendrier" onclick="naviguerVers('calendrier')">Calendrier</button>
+  <button class="nav-btn" data-section="date-libre" onclick="naviguerVers('date-libre')">Date libre</button>
+  <button class="nav-btn" data-section="violations" onclick="naviguerVers('violations')">Violations</button>
+</nav>
+
+<div class="wrap">
+
+  <!-- ── INSÉRER ── -->
+  <div class="section active" id="inserer">
+    <div class="titre-section">Nouvelle intention</div>
+
+    <!-- Étape 1 : saisie -->
+    <div class="carte" id="etape1">
+      <div class="grille">
+        <div class="champ" style="grid-column:1/-1">
+          <label>Nom *</label>
+          <input type="text" id="nom" placeholder="ex. RIP — Jean Dupont  ou  Guérison de Marie">
+        </div>
+        <div class="champ">
+          <label>Demandeur</label>
+          <input type="text" id="demandeur" placeholder="ex. Mme Martin">
+        </div>
+        <div class="champ">
+          <label>Date souhaitée</label>
+          <input type="date" id="date_souhaitee">
+          <label class="toggle-dqp">
+            <input type="checkbox" id="des_que_possible">
+            <span>Dès que possible</span>
+          </label>
+        </div>
+        <div class="champ" style="grid-column:1/-1">
+          <label>Durée</label>
+          <div class="duree-btns" id="duree-btns">
+            <button type="button" class="btn-duree actif" data-duree="1">Un jour</button>
+            <button type="button" class="btn-duree" data-duree="9">Neuvaine</button>
+            <button type="button" class="btn-duree" data-duree="30">Trentain</button>
+          </div>
+        </div>
+        <div class="champ" style="grid-column:1/-1">
+          <label>Note</label>
+          <textarea id="description" placeholder="Précision contextuelle…"></textarea>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-teal" id="btn-verifier">Vérifier</button>
+        <span class="spinner cache" id="spin-verifier"></span>
+      </div>
+    </div>
+
+    <!-- Étape 2 : confirmation (cachée jusqu'au Vérifier) -->
+    <div class="carte" id="etape2" style="display:none">
+      <div id="verif-date-affichage" style="margin-bottom:1rem">
+        <div style="font-size:.72rem;font-weight:600;color:var(--texte2);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.35rem">Date proposée</div>
+        <div id="verif-date-val" style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:500;color:var(--texte)"></div>
+        <div id="verif-date-info" style="font-size:.82rem;color:var(--texte3);margin-top:.2rem"></div>
+      </div>
+      <div id="verif-deplacements" style="display:none;margin-bottom:1rem">
+        <div style="font-size:.72rem;font-weight:600;color:var(--texte2);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.35rem">Déplacements prévus</div>
+        <div id="verif-dep-liste" style="font-size:.84rem;color:var(--texte2)"></div>
+      </div>
+      <label class="toggle-dqp" style="margin-bottom:1rem">
+        <input type="checkbox" id="bloquer-date">
+        <span>Bloquer cette date (♦)</span>
+      </label>
+      <div class="btn-row">
+        <button type="button" class="btn btn-teal" id="btn-inserer-final">Insérer</button>
+        <button type="button" class="btn btn-ghost" id="btn-retour">← Modifier</button>
+        <span class="spinner cache" id="spin-inserer"></span>
+      </div>
+    </div>
+
+    <div class="message" id="msg-inserer"></div>
+  </div>
+
+  <!-- ── CALENDRIER ── -->
+  <div class="section" id="calendrier">
+    <div class="nav-mois">
+      <button class="btn btn-ghost" id="mois-prev">←</button>
+      <h2 id="titre-mois">…</h2>
+      <button class="btn btn-ghost" id="mois-next">→</button>
+      <button class="btn btn-ghost btn-actualiser" id="btn-actualiser" title="Actualiser">↻</button>
+      <span class="spinner cache" id="spin-cal"></span>
+    </div>
+    <div class="legende">
+      <span class="leg-item"><span class="leg-dot" style="background:var(--vert)"></span>Libre</span>
+      <span class="leg-item"><span class="leg-dot" style="background:var(--rouge)"></span>Violation</span>
+    </div>
+    <div class="grille-cal-wrap">
+      <div class="grille-cal" id="grille-cal"></div>
+    </div>
+    <div class="planning-cal" id="planning-cal"></div>
+  </div>
+
+  <!-- ── DATE LIBRE ── -->
+  <div class="section" id="date-libre">
+    <div class="titre-section">Prochaine date libre</div>
+    <div class="carte">
+      <div class="grille">
+        <div class="champ">
+          <label>À partir de</label>
+          <input type="date" id="dl-depuis">
+        </div>
+        <div class="champ">
+          <label>Durée en jours</label>
+          <input type="number" id="dl-duree" value="1" min="1" max="30">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-teal" id="btn-dl">Chercher</button>
+        <span class="spinner cache" id="spin-dl"></span>
+      </div>
+    </div>
+    <div class="result-libre" id="result-libre"></div>
+  </div>
+
+  <!-- ── VIOLATIONS ── -->
+  <div class="section" id="violations">
+    <div class="titre-section">Violations de capacité</div>
+    <div class="btn-row" style="margin-bottom:1.2rem">
+      <button class="btn btn-teal" id="btn-violations">Analyser</button>
+      <button class="btn btn-ghost" id="btn-corriger" style="display:none">Corriger</button>
+      <span class="spinner cache" id="spin-viol"></span>
+    </div>
+    <div id="liste-violations"></div>
+  </div>
+
+</div>
+
+
+<!-- ── POPUP IOS ── -->
+<div class="ios-popup" id="ios-popup">
+  <div class="ios-popup-titre">
+    Installer l'application
+    <span class="ios-popup-close" onclick="document.getElementById('ios-popup').classList.remove('visible')">✕</span>
+  </div>
+  Appuyez sur <strong>Partager</strong> <span style="font-size:1.1em">⎙</span> puis <strong>« Sur l'écran d'accueil »</strong> pour installer l'application.
+</div>
+
+<!-- ── POPUP JOUR ── -->
+<div class="popup-overlay" id="popup-overlay">
+  <div class="popup">
+    <h3 id="popup-titre">—</h3>
+    <ul class="liste-intentions" id="popup-intentions"></ul>
+    <div class="btn-row" style="margin-top:1rem">
+      <button class="btn btn-ghost" onclick="fermerPopup()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── POPUP CONFIRMATION ── -->
+<div class="popup-overlay" id="popup-confirm">
+  <div class="popup">
+    <h3 id="confirm-titre">Confirmation requise</h3>
+    <div id="confirm-body" style="font-size:.9rem;color:var(--texte2);line-height:1.65;margin-bottom:.8rem"></div>
+    <div class="btn-row">
+      <button class="btn btn-teal" id="confirm-ok">Confirmer</button>
+      <button class="btn btn-ghost" onclick="fermerConfirm()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const MOIS_FR  = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const JOURS_3  = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+
+const today = new Date(); today.setHours(0,0,0,0);
+const todayISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+const limiteMin = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+const limiteMax = new Date(today.getFullYear(), today.getMonth() + 11, 1);
+
+let calMois  = today.getMonth() + 1;
+let calAnnee = today.getFullYear();
+
+// ── Onglets ──────────────────────────────────────────────────────────────────
+function naviguerVers(sectionId) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('actif'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  const btn = document.querySelector(`[data-section="${sectionId}"]`);
+  if (btn) btn.classList.add('actif');
+  const section = document.getElementById(sectionId);
+  if (section) section.classList.add('active');
+  if (sectionId === 'calendrier') afficherMois();
+}
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => naviguerVers(btn.dataset.section));
+});
+
+// ── Cache calendrier (persistant via localStorage + mémoire) ─────────────────
+const CACHE_KEY = 'intentions_cal_cache_v1';
+const CACHE_MAX_AGE = 10 * 60 * 1000;  // 10 min : au-delà, rechargement auto
+
+let cache = {};          // { "YYYY-MM": [jours] }
+let cacheGenere = 0;     // timestamp du dernier chargement
+
+// Restaurer depuis localStorage au démarrage
+try {
+  const saved = localStorage.getItem(CACHE_KEY);
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    if (parsed && parsed.mois && parsed.ts) {
+      cache = parsed.mois;
+      cacheGenere = parsed.ts;
+    }
+  }
+} catch { /* localStorage indisponible : on reste en mémoire */ }
+
+function sauverCache() {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ mois: cache, ts: cacheGenere }));
+  } catch { /* quota dépassé ou indisponible : ignore */ }
+}
+
+function cacheEstFrais() {
+  return cacheGenere > 0 && (Date.now() - cacheGenere) < CACHE_MAX_AGE
+    && Object.keys(cache).length > 0;
+}
+
+function cleCal(m, y) { return `${y}-${String(m).padStart(2,'0')}`; }
+
+function estDansLimites(m, y) {
+  const d = new Date(y, m - 1, 1);
+  return d >= limiteMin && d <= limiteMax;
+}
+
+function majNav() {
+  let pm = calMois - 1, py = calAnnee;
+  if (pm < 1) { pm = 12; py--; }
+  let nm = calMois + 1, ny = calAnnee;
+  if (nm > 12) { nm = 1; ny++; }
+  document.getElementById('mois-prev').disabled = !estDansLimites(pm, py);
+  document.getElementById('mois-next').disabled = !estDansLimites(nm, ny);
+}
+
+// Charge TOUS les mois (-3 à +11) en UN SEUL appel réseau
+async function chargerPlage(forcer = false) {
+  if (!forcer && cacheEstFrais()) return;
+  const r = await fetch(`/api/calendrier-plage${forcer ? '?forcer=true' : ''}`);
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail || r.statusText); }
+  const data = await r.json();
+  cache = data.mois;
+  cacheGenere = Date.now();
+  sauverCache();
+}
+
+// Pré-chargement : ne recharge que si le cache n'est plus frais
+async function prechargerTout(forcer = false) {
+  try { await chargerPlage(forcer); } catch(e) { console.warn('prechargerTout:', e); }
+}
+
+async function afficherMois(forcer = false) {
+  majNav();
+  document.getElementById('titre-mois').textContent = `${MOIS_FR[calMois-1]} ${calAnnee}`;
+  const spin = document.getElementById('spin-cal');
+  spin.classList.remove('cache');
+  try {
+    // Si cache absent ou périmé (ou forcé), recharger toute la plage
+    if (forcer || !cacheEstFrais()) await chargerPlage(forcer);
+    const jours = cache[cleCal(calMois, calAnnee)];
+    if (!jours) {
+      // Mois hors plage en cache : charger ce mois isolément en secours
+      const r = await fetch(`/api/calendrier?mois=${calMois}&annee=${calAnnee}`);
+      if (!r.ok) throw new Error('Mois indisponible');
+      const data = await r.json();
+      cache[cleCal(calMois, calAnnee)] = data.jours;
+      sauverCache();
+      renderGrille(data.jours); renderPlanning(data.jours);
+    } else {
+      renderGrille(jours); renderPlanning(jours);
+    }
+  } catch(e) {
+    const msg = `<div style="padding:1.5rem;color:var(--rouge);font-size:.88rem">Erreur : ${e.message}</div>`;
+    document.getElementById('grille-cal').innerHTML = msg;
+    document.getElementById('planning-cal').innerHTML = msg;
+  } finally { spin.classList.add('cache'); }
+}
+
+// ── Grille ───────────────────────────────────────────────────────────────────
+function renderGrille(jours) {
+  const g = document.getElementById('grille-cal');
+  g.innerHTML = '';
+  if (!jours || !jours.length) { g.innerHTML = '<div style="grid-column:1/-1;padding:1.5rem;color:var(--texte3)">Aucune donnée.</div>'; return; }
+  ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].forEach(j => {
+    const el = document.createElement('div'); el.className = 'entete-cal'; el.textContent = j; g.appendChild(el);
+  });
+  let dec = (new Date(jours[0].date + 'T00:00:00').getDay() + 6) % 7;
+  for (let i = 0; i < dec; i++) { const v = document.createElement('div'); v.className = 'jour-cal vide'; g.appendChild(v); }
+  jours.forEach(j => {
+    const el = document.createElement('div');
+    el.className = 'jour-cal' + (j.violation ? ' violation' : '') + (j.date === todayISO ? ' aujourd-hui' : '');
+    const num = document.createElement('span'); num.className = 'num-jour';
+    num.textContent = new Date(j.date + 'T00:00:00').getDate(); el.appendChild(num);
+    if (j.libre && !j.violation) { const d = document.createElement('span'); d.className = 'dot-libre'; el.appendChild(d); }
+    if (j.violation)             { const d = document.createElement('span'); d.className = 'dot-viol';  el.appendChild(d); }
+    j.intentions.slice(0,2).forEach(i => {
+      const d = document.createElement('div');
+      d.className = 'intention-mini' + (i.fixe ? ' fixe' : '');
+      d.textContent = i.nom.replace(/^RIP - /, '✝ '); el.appendChild(d);
+    });
+    if (j.intentions.length > 2) { const p = document.createElement('div'); p.className = 'intention-mini'; p.textContent = `+${j.intentions.length-2}`; el.appendChild(p); }
+    const cap = document.createElement('span'); cap.className = 'cap-ind'; cap.textContent = `${j.count}/${j.capacite}`; el.appendChild(cap);
+    el.addEventListener('click', () => ouvrirPopupJour(j));
+    g.appendChild(el);
+  });
+}
+
+// ── Planning ─────────────────────────────────────────────────────────────────
+function renderPlanning(jours) {
+  const p = document.getElementById('planning-cal');
+  p.innerHTML = '';
+  if (!jours || !jours.length) { p.innerHTML = '<div style="padding:1rem;color:var(--texte3)">Aucune donnée.</div>'; return; }
+  jours.forEach(j => {
+    const el = document.createElement('div');
+    el.className = 'planning-jour' + (j.date === todayISO ? ' aujourd-hui' : '') + (j.violation ? ' violation' : '');
+    const d = new Date(j.date + 'T00:00:00');
+    const nomJour = JOURS_3[d.getDay()];
+    const dotColor = j.violation ? 'var(--rouge)' : (j.libre ? 'var(--vert)' : 'var(--bordure)');
+
+    // Header : date à gauche, [dot + cap] à droite
+    const header = document.createElement('div'); header.className = 'planning-header';
+    const dateSpan = document.createElement('span'); dateSpan.className = 'planning-date';
+    dateSpan.textContent = `${nomJour} ${d.getDate()} ${MOIS_FR[d.getMonth()].slice(0,3).toLowerCase()}.`;
+    const right = document.createElement('div'); right.className = 'planning-right';
+    right.innerHTML = `<span class="planning-dot" style="background:${dotColor}"></span><span class="planning-cap">${j.count}/${j.capacite}</span>`;
+    header.appendChild(dateSpan);
+    header.appendChild(right);
+    el.appendChild(header);
+
+    if (j.intentions.length) {
+      const wrap = document.createElement('div'); wrap.className = 'planning-intentions';
+      j.intentions.forEach(i => {
+        const line = document.createElement('div');
+        line.className = 'planning-int' + (i.fixe ? ' fixe' : '');
+        // Pas de tiret, point ni losange — juste le nom
+        line.textContent = i.nom.replace(/^RIP - /, '✝ ');
+        wrap.appendChild(line);
+      });
+      el.appendChild(wrap);
+    } else {
+      const lib = document.createElement('div'); lib.className = 'planning-libre'; lib.textContent = 'libre';
+      el.appendChild(lib);
+    }
+    el.addEventListener('click', () => ouvrirPopupJour(j));
+    p.appendChild(el);
+  });
+}
+
+document.getElementById('mois-prev').addEventListener('click', () => {
+  calMois--; if (calMois < 1)  { calMois = 12; calAnnee--; } afficherMois();
+});
+document.getElementById('mois-next').addEventListener('click', () => {
+  calMois++; if (calMois > 12) { calMois = 1;  calAnnee++; } afficherMois();
+});
+document.getElementById('btn-actualiser').addEventListener('click', async () => {
+  cache = {}; cacheGenere = 0;
+  const spin = document.getElementById('spin-cal');
+  spin.classList.remove('cache');
+  await afficherMois(true);   // force le rechargement Notion + plage complète
+  spin.classList.add('cache');
+});
+
+// ── Popup jour ───────────────────────────────────────────────────────────────
+function ouvrirPopupJour(j) {
+  const d = new Date(j.date + 'T00:00:00');
+  document.getElementById('popup-titre').textContent =
+    `${d.getDate()} ${MOIS_FR[d.getMonth()]} ${d.getFullYear()} — ${j.count}/${j.capacite}`;
+  const ul = document.getElementById('popup-intentions'); ul.innerHTML = '';
+  if (!j.intentions.length) {
+    ul.innerHTML = '<li style="color:var(--texte3);font-style:italic;padding:.5rem 0">Aucune intention</li>';
+  } else {
+    j.intentions.forEach(i => {
+      const li = document.createElement('li');
+      const fb = i.fixe    ? '<span class="badge badge-fixe">♦</span>'         : '';
+      let pbLabel = '';
+      if (i.periode) {
+        if (i.duree_periode === 9)       pbLabel = 'neuvaine';
+        else if (i.duree_periode === 30) pbLabel = 'trentain';
+        else                             pbLabel = 'période';
+      }
+      const pb = pbLabel ? `<span class="badge badge-periode">${pbLabel}</span>` : '';
+      // Retirer le ♦ de fin du nom (il est déjà dans le badge fb)
+      const nomAffiche = i.nom.replace(/\s*♦\s*$/, '');
+      li.innerHTML = `<span class="nom-int">${nomAffiche}${fb}${pb}</span><span class="dem-int">${i.demandeur || '—'}</span>`;
+      ul.appendChild(li);
+    });
+  }
+  document.getElementById('popup-overlay').classList.add('visible');
+}
+function fermerPopup() { document.getElementById('popup-overlay').classList.remove('visible'); }
+document.getElementById('popup-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('popup-overlay')) fermerPopup();
+});
+
+// ── Formulaire ───────────────────────────────────────────────────────────────
+// ── Données retenues après Vérifier ──────────────────────────────────────────
+let _verifData = null;   // résultat de /api/verifier-date
+
+// Vérifier
+document.getElementById('btn-verifier').addEventListener('click', async () => {
+  const nom = document.getElementById('nom').value.trim();
+  if (!nom) { afficherMsg('erreur', 'Le nom est requis.', 'msg-inserer'); return; }
+  const spin = document.getElementById('spin-verifier');
+  const msg  = document.getElementById('msg-inserer');
+  spin.classList.remove('cache'); msg.className = 'message';
+  const duree = parseInt(document.querySelector('.btn-duree.actif').dataset.duree);
+  const dateSouhaitee = document.getElementById('date_souhaitee').value || null;
+  const body = {
+    date_souhaitee:   dateSouhaitee,
+    date_fin:         calculerDateFin(dateSouhaitee, duree),
+    des_que_possible: document.getElementById('des_que_possible').checked,
+    duree:            duree,
+  };
+  try {
+    const r = await fetch('/api/verifier-date', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) { afficherMsg('erreur', data.detail || 'Erreur', 'msg-inserer'); return; }
+    _verifData = data;
+    // Afficher étape 2
+    document.getElementById('verif-date-val').textContent = fmtDate(data.date) + (data.date_fin ? ' → ' + fmtDate(data.date_fin) : '');
+    // Info capacité et présents
+    const nb = data.intentions_presentes.length;
+    const cap = data.capacite;
+    let info = `Capacité : ${cap}  ·  ${nb} intention${nb>1?'s':''} présente${nb>1?'s':''}`;
+    if (data.date !== (dateSouhaitee || '')) info = 'Date ajustée  ·  ' + info;
+    document.getElementById('verif-date-info').textContent = info;
+    // Déplacements prévus
+    const depDiv = document.getElementById('verif-deplacements');
+    if (data.deplacements_prevus.length) {
+      let depHtml = '';
+      data.deplacements_prevus.forEach(d => {
+        depHtml += `· <em>${d.nom}</em> : ${fmtDate(d.ancienne_date)} → ${fmtDate(d.nouvelle_date)}<br>`;
+      });
+      document.getElementById('verif-dep-liste').innerHTML = depHtml;
+      depDiv.style.display = 'block';
+    } else {
+      depDiv.style.display = 'none';
+    }
+    // Pré-cocher ♦ si date_precise
+    document.getElementById('bloquer-date').checked = data.date_precise;
+    // Basculer les étapes
+    document.getElementById('etape2').style.display = 'block';
+    document.getElementById('etape2').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch(e) { afficherMsg('erreur', 'Erreur réseau : ' + e.message, 'msg-inserer'); }
+  finally { spin.classList.add('cache'); }
+});
+
+// Retour à l'étape 1
+document.getElementById('btn-retour').addEventListener('click', () => {
+  document.getElementById('etape2').style.display = 'none';
+  _verifData = null;
+});
+
+// Insérer (étape 2)
+document.getElementById('btn-inserer-final').addEventListener('click', async () => {
+  if (!_verifData) return;
+  const spin = document.getElementById('spin-inserer');
+  const msg  = document.getElementById('msg-inserer');
+  spin.classList.remove('cache'); msg.className = 'message';
+  const body = {
+    nom:              document.getElementById('nom').value.trim(),
+    demandeur:        document.getElementById('demandeur').value.trim() || null,
+    description:      document.getElementById('description').value.trim() || null,
+    date_souhaitee:   _verifData.date,
+    date_fin:         _verifData.date_fin,
+    des_que_possible: document.getElementById('des_que_possible').checked,
+    date_precise:     document.getElementById('bloquer-date').checked,
+    force_date:       false,
+  };
+  try {
+    const r = await fetch('/api/inserer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (r.status === 409) {
+      if (data.code === 'DATE_PASSEE') {
+        demanderConfirmation('Date dans le passé', `La date <strong>${fmtDate(data.date)}</strong> est dans le passé. Confirmer ?`, async () => {
+          body.force_date = true;
+          const r2 = await fetch('/api/inserer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+          const d2 = await r2.json();
+          afficherSucces(d2);
+        });
+      } else { afficherMsg('erreur', data.message || 'Erreur', 'msg-inserer'); }
+      return;
+    }
+    if (!r.ok) { afficherMsg('erreur', data.detail || 'Erreur serveur', 'msg-inserer'); return; }
+    afficherSucces(data);
+  } catch(e) { afficherMsg('erreur', 'Erreur réseau : ' + e.message, 'msg-inserer'); }
+  finally { spin.classList.add('cache'); }
+});
+
+function afficherSucces(data) {
+  let fin = data.intention.date_fin ? ` → ${fmtDate(data.intention.date_fin)}` : '';
+  let h = `Intention insérée : <strong>${data.intention.nom}</strong> — ${fmtDate(data.intention.date)}${fin}`;
+  if (data.deplacements.length) {
+    h += '<br><br><span style="font-weight:600">Déplacements :</span>';
+    data.deplacements.forEach(d => { h += `<br>· <em>${d.nom}</em> : ${fmtDate(d.ancienne_date)} → ${fmtDate(d.nouvelle_date)}`; });
+  }
+  if (data.alertes && data.alertes.length) {
+    h += '<br><br><span style="font-weight:600;color:var(--rouge)">⚠ Violations résiduelles :</span>';
+    data.alertes.forEach(a => {
+      h += `<br>· ${fmtDate(a.date)} : ${a.count}/${a.capacite}`;
+      a.intentions.forEach(i => { h += `<br>&nbsp;&nbsp;— ${i.nom}${i.demandeur?' ('+i.demandeur+')':''}`; });
+    });
+    afficherMsg('info', h, 'msg-inserer');
+  } else { afficherMsg('succes', h, 'msg-inserer'); }
+  // Reset
+  document.getElementById('nom').value = '';
+  document.getElementById('demandeur').value = '';
+  document.getElementById('description').value = '';
+  document.getElementById('date_souhaitee').value = '';
+  document.getElementById('des_que_possible').checked = false;
+  document.getElementById('bloquer-date').checked = false;
+  document.getElementById('etape2').style.display = 'none';
+  document.querySelectorAll('.btn-duree').forEach(b => b.classList.remove('actif'));
+  document.querySelector('.btn-duree[data-duree="1"]').classList.add('actif');
+  _verifData = null;
+  cache = {}; cacheGenere = 0; sauverCache();
+  chargerIntentionJour();
+}
+
+// ── Date libre ───────────────────────────────────────────────────────────────
+document.getElementById('dl-depuis').value = todayISO;
+document.getElementById('btn-dl').addEventListener('click', async () => {
+  const spin = document.getElementById('spin-dl');
+  const result = document.getElementById('result-libre');
+  spin.classList.remove('cache'); result.classList.remove('visible');
+  try {
+    const r = await fetch('/api/date-libre', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ depuis: document.getElementById('dl-depuis').value, duree: parseInt(document.getElementById('dl-duree').value)||1 })
+    });
+    const data = await r.json();
+    if (!r.ok) { result.innerHTML = `<span style="color:var(--rouge)">${data.detail}</span>`; }
+    else {
+      let html = `<div class="date-libre-val">${fmtDate(data.date)}</div>`;
+      html += `<div style="font-size:.8rem;color:var(--texte3);margin-bottom:.5rem">Capacité : ${data.capacite} — ${data.intentions_existantes.length} intention(s)</div>`;
+      if (data.intentions_existantes.length) {
+        html += '<ul style="list-style:none">';
+        data.intentions_existantes.forEach(i => { html += `<li style="font-size:.85rem;color:var(--texte2);padding:.2rem 0">· ${i.nom}${i.demandeur?' ('+i.demandeur+')':''}</li>`; });
+        html += '</ul>';
+      }
+      result.innerHTML = html;
+    }
+    result.classList.add('visible');
+  } catch(e) { result.innerHTML = `<span style="color:var(--rouge)">Erreur : ${e.message}</span>`; result.classList.add('visible'); }
+  finally { spin.classList.add('cache'); }
+});
+
+// ── Violations ───────────────────────────────────────────────────────────────
+document.getElementById('btn-violations').addEventListener('click', async () => {
+  const spin    = document.getElementById('spin-viol');
+  const liste   = document.getElementById('liste-violations');
+  const btnCorr = document.getElementById('btn-corriger');
+  spin.classList.remove('cache'); liste.innerHTML = ''; btnCorr.style.display = 'none';
+  try {
+    const r = await fetch('/api/violations');
+    const data = await r.json();
+    if (!data.length) {
+      liste.innerHTML = '<div class="message info visible">Aucune violation détectée.</div>';
+    } else {
+      data.forEach(v => {
+        const div = document.createElement('div'); div.className = 'violation-item';
+        let h = `<div class="violation-date">${fmtDate(v.date)} — ${v.count}/${v.capacite}</div><ul style="list-style:none">`;
+        v.intentions.forEach(i => { h += `<li style="font-size:.86rem;color:var(--texte2);padding:.2rem 0">· ${i.nom}${i.demandeur?' ('+i.demandeur+')':''}</li>`; });
+        h += '</ul>'; div.innerHTML = h; liste.appendChild(div);
+      });
+      btnCorr.style.display = '';   // afficher le bouton Corriger
+    }
+  } catch(e) { liste.innerHTML = `<div class="message erreur visible">Erreur : ${e.message}</div>`; }
+  finally { spin.classList.add('cache'); }
+});
+
+document.getElementById('btn-corriger').addEventListener('click', async () => {
+  const spin    = document.getElementById('spin-viol');
+  const liste   = document.getElementById('liste-violations');
+  const btnCorr = document.getElementById('btn-corriger');
+  spin.classList.remove('cache'); liste.innerHTML = '';
+  try {
+    const r = await fetch('/api/violations/corriger', { method: 'POST' });
+    const data = await r.json();
+    let html = '';
+    if (data.deplacements.length) {
+      html += '<div class="message succes visible">';
+      html += `<strong>${data.deplacements.length} déplacement${data.deplacements.length > 1 ? 's' : ''} effectué${data.deplacements.length > 1 ? 's' : ''}</strong><br>`;
+      data.deplacements.forEach(d => {
+        const ecart = d.ecart_jours === 1 ? '1 jour' : `${d.ecart_jours} jours`;
+        html += `· <em>${d.nom}</em> : ${fmtDate(d.ancienne_date)} → ${fmtDate(d.nouvelle_date)} <span style="color:var(--texte3);font-size:.82rem">(+${ecart})</span><br>`;
+      });
+      html += '</div>';
+    }
+    if (data.erreurs.length) {
+      html += '<div class="message erreur visible" style="margin-top:.5rem">';
+      data.erreurs.forEach(e => { html += `· ${fmtDate(e.date)} : ${e.message}<br>`; });
+      html += '</div>';
+    }
+    if (!data.deplacements.length && !data.erreurs.length) {
+      html = '<div class="message info visible">Aucune violation à corriger.</div>';
+    }
+    liste.innerHTML = html;
+    btnCorr.style.display = 'none';
+    // Invalider le cache calendrier
+    cache = {}; cacheGenere = 0; sauverCache();
+  } catch(e) { liste.innerHTML = `<div class="message erreur visible">Erreur : ${e.message}</div>`; }
+  finally { spin.classList.add('cache'); }
+});
+
+// ── Confirmation ─────────────────────────────────────────────────────────────
+let confirmCallback = null;
+function demanderConfirmation(titre, body, callback) {
+  document.getElementById('confirm-titre').textContent = titre;
+  document.getElementById('confirm-body').innerHTML = body;
+  confirmCallback = callback;
+  document.getElementById('popup-confirm').classList.add('visible');
+}
+document.getElementById('confirm-ok').addEventListener('click', () => { fermerConfirm(); if (confirmCallback) confirmCallback(); });
+function fermerConfirm() { document.getElementById('popup-confirm').classList.remove('visible'); confirmCallback = null; }
+
+// ── Utilitaires ──────────────────────────────────────────────────────────────
+function fmtDate(iso) {
+  const [y,m,d] = iso.split('-');
+  return `${parseInt(d)} ${MOIS_FR[parseInt(m)-1]} ${y}`;
+}
+function afficherMsg(type, html, id) {
+  const el = document.getElementById(id);
+  el.className = `message ${type} visible`; el.innerHTML = html;
+}
+
+
+
+// Intercepter les 401 → rediriger vers login
+const _fetchOrig = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const r = await _fetchOrig(...args);
+  if (r.status === 401) { window.location.href = '/login'; }
+  return r;
+};
+
+// ── PWA & Notifications ───────────────────────────────────────────────────────
+// Un seul enregistrement du SW, sans double appel
+(function() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+})();
+
+// Bouton installer
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+  || window.navigator.standalone === true;
+let deferredPrompt = null;
+const btnInstall = document.getElementById('btn-install');
+
+if (btnInstall && !isStandalone) {
+  if (isIOS) {
+    btnInstall.classList.add('visible');
+    btnInstall.addEventListener('click', () => {
+      document.getElementById('ios-popup').classList.add('visible');
+    });
+  } else {
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      btnInstall.classList.add('visible');
+    });
+    btnInstall.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      if (outcome === 'accepted') btnInstall.classList.remove('visible');
+    });
+    window.addEventListener('appinstalled', () => {
+      btnInstall.classList.remove('visible');
+      deferredPrompt = null;
+    });
+  }
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+const btnNotif = document.getElementById('btn-notif');
+let vapidPublicKey = null;
+
+// Identifiant unique par navigateur (persistant)
+function getDeviceId() {
+  let id = localStorage.getItem('push_device_id');
+  if (!id) {
+    id = 'dev-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    localStorage.setItem('push_device_id', id);
+  }
+  return id;
+}
+function getDeviceName() {
+  const ua = navigator.userAgent;
+  if (/Android/.test(ua)) return 'Android Chrome';
+  if (/iPhone|iPad/.test(ua)) return 'iOS Safari';
+  if (/Windows/.test(ua)) return 'Windows Chrome';
+  if (/Mac/.test(ua)) return 'Mac Chrome';
+  return 'Navigateur';
+}
+const DEVICE_ID   = getDeviceId();
+const DEVICE_NAME = getDeviceName();
+
+// ── Boutons durée ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.btn-duree').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.btn-duree').forEach(b => b.classList.remove('actif'));
+    btn.classList.add('actif');
+  });
+});
+
+function calculerDateFin(dateDebut, duree) {
+  if (duree <= 1) return null;
+  if (!dateDebut) return null;
+  const d = new Date(dateDebut + 'T00:00:00');
+  d.setDate(d.getDate() + duree - 1);
+  return d.toISOString().split('T')[0];
+}
+
+async function majEtatBoutonNotif() {
+  try {
+    const perm = Notification.permission;
+    const r = await fetch(`/api/push/status?device_id=${DEVICE_ID}`).catch(() => null);
+    const actif = r && r.ok ? (await r.json()).actif : false;
+    if (perm === 'granted' && actif) {
+      btnNotif.classList.add('actif');
+      btnNotif.title = 'Notifications actives — toucher pour désactiver';
+      btnNotif.innerHTML = '🔔';
+    } else {
+      btnNotif.classList.remove('actif');
+      btnNotif.title = 'Activer les notifications du matin (6h45)';
+      btnNotif.innerHTML = '🔕';
+    }
+  } catch(e) { console.warn('majEtatBoutonNotif:', e); }
+}
+
+async function toggleNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    afficherMsg('erreur', 'Votre navigateur ne supporte pas les notifications push.', 'msg-inserer');
+    naviguerVers('inserer'); return;
+  }
+  if (!vapidPublicKey) {
+    try {
+      const r = await fetch('/api/push/vapid-public-key');
+      if (!r.ok) throw new Error('Statut ' + r.status);
+      vapidPublicKey = (await r.json()).publicKey;
+    } catch(e) {
+      afficherMsg('erreur', 'Configuration VAPID inaccessible : ' + e.message, 'msg-inserer');
+      naviguerVers('inserer'); return;
+    }
+  }
+  const perm = Notification.permission;
+  let actif = false;
+  try { const sr = await fetch('/api/push/status'); if (sr.ok) actif = (await sr.json()).actif; } catch {}
+
+  if (perm === 'granted' && actif) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+      await fetch(`/api/push/subscribe?device_id=${DEVICE_ID}`, { method: 'DELETE' });
+      await majEtatBoutonNotif();
+      afficherMsg('info', 'Notifications désactivées.', 'msg-inserer');
+    } catch(e) { afficherMsg('erreur', 'Erreur : ' + e.message, 'msg-inserer'); }
+    naviguerVers('inserer'); return;
+  }
+  if (perm === 'denied') {
+    alert('Notifications bloquées. Autorisez-les dans Chrome → Paramètres du site → Notifications.');
+    return;
+  }
+  try {
+    if (await Notification.requestPermission() !== 'granted') {
+      afficherMsg('info', 'Permission refusée.', 'msg-inserer');
+      naviguerVers('inserer'); return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    });
+    const subJson = sub.toJSON();
+    await fetch('/api/push/subscribe', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ...subJson, device_id: DEVICE_ID, device_name: DEVICE_NAME }),
+    });
+    await majEtatBoutonNotif();
+    const testR = await fetch(`/api/push/test?device_id=${DEVICE_ID}`, { method: 'POST' });
+    if (testR.ok) {
+      afficherMsg('succes', '✓ Notifications activées — une notification de test vient d\'être envoyée.', 'msg-inserer');
+    } else {
+      const err = await testR.json().catch(() => ({}));
+      afficherMsg('info', 'Abonnement enregistré. Erreur test : ' + (err.detail || 'vérifiez VAPID sur Railway.'), 'msg-inserer');
+    }
+  } catch(e) { afficherMsg('erreur', 'Erreur : ' + e.message, 'msg-inserer'); }
+  naviguerVers('inserer');
+}
+
+function urlBase64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+if (btnNotif) {
+  btnNotif.addEventListener('click', toggleNotifications);
+  // Init état bouton après que le SW soit prêt
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    navigator.serviceWorker.ready.then(async () => {
+      try {
+        const r = await fetch('/api/push/vapid-public-key');
+        if (r.ok) vapidPublicKey = (await r.json()).publicKey;
+      } catch {}
+      await majEtatBoutonNotif();
+    }).catch(() => {});
+  }
+}
+
+// ── Intention du jour ────────────────────────────────────────────────────────
+async function chargerIntentionJour() {
+  try {
+    const r = await fetch(`/api/calendrier?mois=${today.getMonth()+1}&annee=${today.getFullYear()}`);
+    if (!r.ok) return;
+    const data = await r.json();
+    console.log('[bandeau] todayISO:', todayISO);
+    console.log('[bandeau] today.getDate():', today.getDate(), 'getMonth+1:', today.getMonth()+1);
+    const jourData = data.jours.find(j => j.date === todayISO);
+    console.log('[bandeau] jourData trouvé:', jourData ? jourData.date : 'AUCUN');
+    if (jourData) console.log('[bandeau] intentions:', jourData.intentions.map(i => i.nom));
+    // Log les 3 jours autour d'aujourd'hui pour comparaison
+    const idx = data.jours.findIndex(j => j.date === todayISO);
+    if (idx >= 0) {
+      for (let i = Math.max(0, idx-1); i <= Math.min(data.jours.length-1, idx+1); i++) {
+        const j = data.jours[i];
+        console.log(`[bandeau] j[${i}] date=${j.date} intentions=${j.intentions.map(x=>x.nom).join(',')}`);
+      }
+    }
+    const bandeau = document.getElementById('intention-jour');
+    if (!jourData || !jourData.intentions.length) {
+      bandeau.style.display = 'none';
+      return;
+    }
+    const texte = jourData.intentions.map(i => i.nom.replace(/^RIP - /, '✝\u00a0')).join('\u2003·\u2003');
+    bandeau.textContent = texte;
+    bandeau.style.display = 'block';
+  } catch(e) { console.error('[bandeau] erreur:', e); }
+}
+chargerIntentionJour();
+
+// ── Init calendrier ───────────────────────────────────────────────────────────
+prechargerTout();
+
+</script>
+</body>
